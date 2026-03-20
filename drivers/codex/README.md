@@ -11,6 +11,7 @@ next prompt to run in Codex.
 - `bin/forge-init` — create a new Forge session for the current project
 - `bin/forge-continue` — print the next iteration prompt for an existing session
 - `bin/forge-cancel` — cancel the active Codex Forge loop without deleting forge-state
+- `bin/forge-status` — show the current Codex Forge session status without mutating state
 - `lib.sh` — shared state helpers used by the Codex driver scripts
 - `prompt.md` — shared prompt template used by the driver scripts
 

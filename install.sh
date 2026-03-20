@@ -15,7 +15,7 @@ mkdir -p "${CLAUDE_DIR}/commands"
 mkdir -p "${CLAUDE_DIR}/agents"
 
 # Verify source files exist
-for src in "skills/forge/SKILL.md" "commands/forge.md" "commands/cancel-ralph.md" "agents/forge.md"; do
+for src in "skills/forge/SKILL.md" "commands/forge.md" "commands/cancel-ralph.md" "commands/forge-status.md" "agents/forge.md" "scripts/forge-state-lib.sh"; do
   if [[ ! -f "${SCRIPT_DIR}/${src}" ]]; then
     echo "Error: Source file not found: ${SCRIPT_DIR}/${src}" >&2
     exit 1
@@ -41,6 +41,12 @@ if [ -L "${CLAUDE_DIR}/commands/cancel-ralph.md" ] || [ -f "${CLAUDE_DIR}/comman
 fi
 ln -s "${SCRIPT_DIR}/commands/cancel-ralph.md" "${CLAUDE_DIR}/commands/cancel-ralph.md"
 echo "  Linked commands/cancel-ralph.md"
+
+if [ -L "${CLAUDE_DIR}/commands/forge-status.md" ] || [ -f "${CLAUDE_DIR}/commands/forge-status.md" ]; then
+  rm -f "${CLAUDE_DIR}/commands/forge-status.md"
+fi
+ln -s "${SCRIPT_DIR}/commands/forge-status.md" "${CLAUDE_DIR}/commands/forge-status.md"
+echo "  Linked commands/forge-status.md"
 
 # Agent
 if [ -L "${CLAUDE_DIR}/agents/forge.md" ] || [ -f "${CLAUDE_DIR}/agents/forge.md" ]; then

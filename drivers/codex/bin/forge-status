@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+LIB_PATH="${ROOT_DIR}/drivers/codex/lib.sh"
+STATE_DIR="$(pwd)/.codex/forge"
+
+source "$LIB_PATH"
+
+session_id="${1:-}"
+if [[ "${session_id:-}" == "--help" ]] || [[ "${session_id:-}" == "-h" ]]; then
+  echo "Usage: forge-status [SESSION_ID]" >&2
+  exit 1
+fi
+
+if [[ ! -d "$STATE_DIR" ]]; then
+  echo "Error: .codex/forge does not exist in this project." >&2
+  exit 1
+fi
+
+forge_codex_status "$STATE_DIR" "$session_id"

@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INIT_PATH="${ROOT_DIR}/drivers/codex/bin/forge-init"
 CONTINUE_PATH="${ROOT_DIR}/drivers/codex/bin/forge-continue"
 CANCEL_PATH="${ROOT_DIR}/drivers/codex/bin/forge-cancel"
+STATUS_PATH="${ROOT_DIR}/drivers/codex/bin/forge-status"
 INSTALL_PATH="${ROOT_DIR}/install-codex.sh"
 
 fail() {
@@ -89,6 +90,7 @@ test_codex_install() {
     assert_file "$tmp_home/.codex/bin/forge-init" "install-codex should link forge-init"
     assert_file "$tmp_home/.codex/bin/forge-continue" "install-codex should link forge-continue"
     assert_file "$tmp_home/.codex/bin/forge-cancel" "install-codex should link forge-cancel"
+    assert_file "$tmp_home/.codex/bin/forge-status" "install-codex should link forge-status"
   )
   rm -rf "$repo_dir" "$tmp_home"
 }
@@ -119,10 +121,46 @@ test_multiple_active_sessions_require_explicit_id() {
   rm -rf "$repo_dir"
 }
 
+test_status_and_error_paths() {
+  local repo_dir
+  repo_dir="$(mktemp -d)"
+  (
+    cd "$repo_dir"
+    output_init="$("$INIT_PATH" "Status scope" --max-iterations 2)"
+    session_id="$(printf '%s\n' "$output_init" | awk '/Initialized Forge Codex driver session/ {print $6}' | tr -d '.')"
+
+    output_status="$("$STATUS_PATH" "$session_id")"
+    assert_contains "$output_status" "Session: ${session_id}" "forge-status should report the session"
+    assert_contains "$output_status" "Next iteration: 1" "forge-status should report the next required iteration"
+
+    sed -i.bak 's/^max_iterations: .*/max_iterations: nope/' ".codex/forge/loop-state.${session_id}.md"
+    rm -f ".codex/forge/loop-state.${session_id}.md.bak"
+    if "$CONTINUE_PATH" "$session_id" >/tmp/forge-invalid.out 2>/tmp/forge-invalid.err; then
+      fail "forge-continue should fail on invalid max_iterations metadata"
+    fi
+    assert_contains "$(cat /tmp/forge-invalid.err)" "invalid iteration metadata" "forge-continue should report invalid iteration metadata"
+
+    sed -i.bak 's/^max_iterations: .*/max_iterations: 1/' ".codex/forge/loop-state.${session_id}.md"
+    rm -f ".codex/forge/loop-state.${session_id}.md.bak"
+    cat >> ".codex/forge/forge-state.${session_id}.md" <<'EOF'
+
+## Iteration 1 - done
+- Coverage: 80.0 -> 81.0 (+1.0%)
+EOF
+    if "$CONTINUE_PATH" "$session_id" >/tmp/forge-max.out 2>/tmp/forge-max.err; then
+      fail "forge-continue should fail after max_iterations is exhausted"
+    fi
+    assert_contains "$(cat /tmp/forge-max.err)" "already past max_iterations" "forge-continue should report max-iteration exhaustion"
+    rm -f /tmp/forge-invalid.out /tmp/forge-invalid.err /tmp/forge-max.out /tmp/forge-max.err
+  )
+  rm -rf "$repo_dir"
+}
+
 main() {
   test_codex_init_continue_cancel
   test_codex_install
   test_multiple_active_sessions_require_explicit_id
+  test_status_and_error_paths
   echo "codex-driver tests passed"
 }
 

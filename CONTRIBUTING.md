@@ -7,7 +7,7 @@ Thanks for your interest in contributing.
 1. Fork the repo
 2. Create a feature branch (`git checkout -b my-feature`)
 3. Make your changes
-4. Test by running `bash tests/stop-hook.test.sh`, `bash tests/codex-driver.test.sh`, `./install.sh`, `./install-codex.sh`, and using the driver in a real project
+4. Test by running `bash tests/stop-hook.test.sh`, `bash tests/codex-driver.test.sh`, `./install.sh`, `./install-codex.sh`, and using the driver and status commands in a real project
 5. Commit with a clear message
 6. Push and open a PR
 

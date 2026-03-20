@@ -21,7 +21,7 @@
 **Forge Core with first-class drivers for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex/manual workflows.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.4.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.2-green.svg)](CHANGELOG.md)
 
 Forge is a protocol plus an adapter. The protocol defines KPI tracking, state, strategy rotation, evaluation cadence, and completion rules. The bundled adapter makes that protocol run inside Claude Code with commands, agents, and a stop hook.
 
@@ -54,6 +54,7 @@ The bundled runtime adapter in this repo:
 
 - `/forge` command
 - `/cancel-ralph` command
+- `/forge-status` command
 - `agents/forge.md`
 - `hooks/stop-hook.sh`
 - install script that wires those assets into `~/.claude/`
@@ -66,9 +67,11 @@ The bundled Codex/manual adapter in this repo:
 - `drivers/codex/bin/forge-init`
 - `drivers/codex/bin/forge-continue`
 - `drivers/codex/bin/forge-cancel`
+- `drivers/codex/bin/forge-status`
 - `.codex/forge/` state layout for per-project sessions
+- shared shell state helpers reused across drivers
 
-Both drivers are first-class in `v0.4.1`. The difference is automation depth:
+Both drivers are first-class in `v0.4.2`. The difference is automation depth:
 Claude gets hook-driven iteration; Codex gets manual driver scripts that print
 the next prompt and manage session state.
 
@@ -80,7 +83,7 @@ the next prompt and manage session state.
 | Codex CLI | First-class manual driver | Install script, `forge-init`, `forge-continue`, `forge-cancel`, project-local state |
 | Other agents / plain shell | Protocol-only | Reuse the protocol and state model manually |
 
-Forge is not claiming native parity across agent runtimes. `v0.4.1` ships two real drivers with different control surfaces.
+Forge is not claiming native parity across agent runtimes. `v0.4.2` ships two real drivers with different control surfaces.
 
 ---
 
@@ -183,7 +186,8 @@ Typical flow:
 1. Run `forge-init "scope" ...` in the target project.
 2. Paste the printed prompt into Codex.
 3. After each iteration, run `forge-continue` to print the next prompt.
-4. Use `forge-cancel` to stop the active loop while preserving Forge state.
+4. Use `forge-status` to inspect the active session.
+5. Use `forge-cancel` to stop the active loop while preserving Forge state.
 
 This is a first-class manual driver, not a hook-based runtime integration.
 
@@ -191,6 +195,7 @@ Driver safety:
 
 - `forge-continue` derives the next iteration from recorded Forge state entries
 - multiple active Codex sessions require an explicit session id instead of implicit selection
+- `forge-status` is read-only and reports the next required iteration from Forge state
 
 ---
 
@@ -222,6 +227,7 @@ Driver safety:
 
 - **Pause**: Forge outputs `RALPH_PAUSE` when it needs your input
 - **Cancel**: `/cancel-ralph` stops the loop
+- **Status**: `/forge-status` reports the current Claude driver session state
 - **Inspect state**: `.claude/forge-state.SESSION.md` is preserved when you pause or cancel
 
 ### Protocol-Only / Manual
@@ -289,11 +295,14 @@ forge-loop/
 ├── skills/forge/SKILL.md    ← The protocol (source of truth)
 ├── commands/forge.md         ← Claude Code /forge command
 ├── commands/cancel-ralph.md  ← Stops the active loop in this project
+├── commands/forge-status.md  ← Shows Claude driver session status
 ├── drivers/codex/            ← Codex/manual driver scripts + prompt template
 │   ├── bin/
 │   │   ├── forge-init
 │   │   ├── forge-continue
-│   │   └── forge-cancel
+│   │   ├── forge-cancel
+│   │   └── forge-status
+│   ├── lib.sh
 │   ├── prompt.md
 │   └── README.md
 ├── agents/forge.md           ← Subagent for spawning forge on subsystems
@@ -302,6 +311,7 @@ forge-loop/
 │   └── stop-hook.sh          ← Stop hook script
 ├── install.sh                ← Installer script
 ├── install-codex.sh          ← Codex driver installer
+├── scripts/forge-state-lib.sh ← Shared shell state helpers
 ├── tests/
 │   ├── stop-hook.test.sh
 │   └── codex-driver.test.sh

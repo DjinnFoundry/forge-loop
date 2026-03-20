@@ -7,28 +7,11 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../scripts/forge-state-lib.sh"
+
 # Read hook input from stdin
 HOOK_INPUT=$(cat)
-
-# Helpers
-frontmatter() {
-  sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$1"
-}
-
-frontmatter_value() {
-  local file="$1"
-  local key="$2"
-
-  frontmatter "$file" \
-    | awk -F: -v key="$key" '$1 == key { sub(/^[^:]+:[[:space:]]*/, "", $0); print; exit }'
-}
-
-strip_quotes() {
-  local value="${1:-}"
-  value="${value#\"}"
-  value="${value%\"}"
-  printf '%s' "$value"
-}
 
 has_exact_control_line() {
   local output="$1"
@@ -56,12 +39,12 @@ find_session_state_file() {
 
     local stored_transcript
     local active_state
-    active_state=$(strip_quotes "$(frontmatter_value "$state_file" "active")")
+    active_state=$(forge_strip_quotes "$(forge_frontmatter_value "$state_file" "active")")
 
     # Paused loops stay paused until explicitly resumed.
     [[ "$active_state" == "true" ]] || continue
 
-    stored_transcript=$(strip_quotes "$(frontmatter_value "$state_file" "session_transcript")")
+    stored_transcript=$(forge_strip_quotes "$(forge_frontmatter_value "$state_file" "session_transcript")")
 
     # If unclaimed (null or empty), claim it for this session
     if [[ "$stored_transcript" == "null" ]] || [[ -z "$stored_transcript" ]]; then
@@ -97,10 +80,10 @@ if [[ -z "$STATE_FILE" ]] || [[ ! -f "$STATE_FILE" ]]; then
 fi
 
 # Parse frontmatter
-FRONTMATTER=$(frontmatter "$STATE_FILE")
+FRONTMATTER=$(forge_frontmatter "$STATE_FILE")
 ITERATION=$(echo "$FRONTMATTER" | grep '^iteration:' | sed 's/iteration: *//')
 MAX_ITERATIONS=$(echo "$FRONTMATTER" | grep '^max_iterations:' | sed 's/max_iterations: *//')
-COMPLETION_PROMISE=$(strip_quotes "$(echo "$FRONTMATTER" | grep '^completion_promise:' | sed 's/completion_promise: *//')")
+COMPLETION_PROMISE=$(forge_strip_quotes "$(echo "$FRONTMATTER" | grep '^completion_promise:' | sed 's/completion_promise: *//')")
 SESSION_ID=$(basename "$STATE_FILE" | sed 's/ralph-loop\.\(.*\)\.local\.md/\1/')
 
 # Validate numeric fields
