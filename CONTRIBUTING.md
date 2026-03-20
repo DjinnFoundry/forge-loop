@@ -7,7 +7,7 @@ Thanks for your interest in contributing.
 1. Fork the repo
 2. Create a feature branch (`git checkout -b my-feature`)
 3. Make your changes
-4. Test by running `./install.sh` and using `/forge` in a real project
+4. Test by running `bash tests/stop-hook.test.sh`, `./install.sh`, and using `/forge` in a real project
 5. Commit with a clear message
 6. Push and open a PR
 

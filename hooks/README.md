@@ -7,7 +7,7 @@ The forge loop uses a stop hook to re-inject the prompt after each iteration. Th
 When Claude Code exits, the stop hook:
 1. Checks for an active `.claude/ralph-loop.*.local.md` state file bound to this session
 2. If found, reads the last assistant message from the transcript
-3. Checks for completion signals (`RALPH_COMPLETE`, `RALPH_PAUSE`, promise tags)
+3. Checks for exact control lines (`RALPH_COMPLETE`, `RALPH_PAUSE`, promise tags)
 4. If not complete, increments the iteration counter and re-injects the prompt
 5. This creates the autoregressive loop — each new iteration sees the updated forge-state file
 
@@ -39,11 +39,11 @@ Replace `/path/to/forge-loop` with the actual path where you cloned the repo.
 
 ## Completion signals
 
-The stop hook checks for these signals in the last assistant message:
+The stop hook checks for these exact control lines in the last assistant message:
 
 - `RALPH_COMPLETE` — all targets met, stop the loop and clean up state file
-- `RALPH_PAUSE` — user input needed, pause the loop (state file preserved for resume)
-- `<promise>TEXT</promise>` — completion promise fulfilled (if `--completion-promise` was set)
+- `RALPH_PAUSE` — user input needed, pause the loop and preserve the state file
+- `<promise>TEXT</promise>` — completion promise fulfilled when emitted on its own line (if `--completion-promise` was set)
 - Max iterations reached — safety limit, stop the loop
 
 ## State files
@@ -69,7 +69,7 @@ started_at: "2026-03-20T14:30:00Z"
 Key fields:
 - `session_transcript`: Set to `null` initially, claimed by the first session that runs the stop hook. Binds the state file to one Claude Code session.
 - `iteration`: Incremented by the stop hook on each cycle
-- `active`: Set to `paused` on `RALPH_PAUSE`, state file deleted on completion
+- `active`: Set to `paused` on `RALPH_PAUSE`; paused loop files are ignored until you manually set them back to `true` or start a fresh loop
 
 ### Forge KPI state: `.claude/forge-state.SESSION.md`
 

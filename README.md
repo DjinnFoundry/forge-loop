@@ -21,9 +21,9 @@
 **Autoregressive codebase improvement for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.1-green.svg)](CHANGELOG.md)
 
-A structured, KPI-driven, self-correcting loop that tracks metrics (coverage, speed, quality), evaluates with fresh-context subagents, rotates strategies when stagnating, and knows when it's done.
+A structured, KPI-driven, self-correcting loop that tracks metrics (coverage, speed, quality), runs fresh-context audits, rotates strategies when stagnating, and uses exact control markers to pause or complete the loop.
 
 ```
 You: /forge "API controllers" --coverage 90 --speed -30%
@@ -107,6 +107,7 @@ mkdir -p ~/.claude/skills/forge ~/.claude/commands ~/.claude/agents
 
 cp skills/forge/SKILL.md ~/.claude/skills/forge/SKILL.md
 cp commands/forge.md ~/.claude/commands/forge.md
+cp commands/cancel-ralph.md ~/.claude/commands/cancel-ralph.md
 cp agents/forge.md ~/.claude/agents/forge.md
 
 # Stop hook — see hooks/README.md for settings.json setup
@@ -140,7 +141,7 @@ cp agents/forge.md ~/.claude/agents/forge.md
 
 - **Pause**: Forge outputs `RALPH_PAUSE` when it needs your input
 - **Cancel**: `/cancel-ralph` stops the loop
-- **Resume**: Start a new session — it picks up the forge-state file
+- **Inspect state**: `.claude/forge-state.SESSION.md` is preserved when you pause or cancel
 
 ---
 
@@ -193,6 +194,7 @@ ideas:
 forge-loop/
 ├── skills/forge/SKILL.md    ← The protocol (source of truth)
 ├── commands/forge.md         ← Claude Code /forge command
+├── commands/cancel-ralph.md  ← Stops the active loop in this project
 ├── agents/forge.md           ← Subagent for spawning forge on subsystems
 ├── hooks/                    ← Iteration engine
 │   ├── README.md             ← Hook setup instructions
@@ -227,10 +229,10 @@ Distilled from studying autoresearch, Ralph Wiggum, pi-autoresearch, SICA, and a
 | Aspect | Raw loop | Forge |
 |--------|----------|-------|
 | KPI tracking | Ad-hoc | Structured state file with deltas + trends |
-| Strategy | Single prompt | 7 named strategies, auto-rotation on stagnation |
-| Evaluation | Self-evaluation (anchoring bias) | Fresh-context subagents every 3 iterations |
+| Strategy | Single prompt | 8 named strategies, auto-rotation on stagnation |
+| Evaluation | Self-evaluation (anchoring bias) | Fresh-context audits every 3 iterations |
 | Memory | Context window only | Persistent state file survives compaction |
-| Completion | Manual / hope | Simultaneous multi-KPI gate |
+| Completion | Manual / hope | Exact completion marker after protocol checks |
 | Lessons | Lost between iterations | Accumulated, inform strategy selection |
 | Stagnation | Repeats same approach | Detects + rotates after low-delta iterations |
 

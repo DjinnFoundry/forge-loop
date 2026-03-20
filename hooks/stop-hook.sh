@@ -10,6 +10,35 @@ set -euo pipefail
 # Read hook input from stdin
 HOOK_INPUT=$(cat)
 
+# Helpers
+frontmatter() {
+  sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$1"
+}
+
+frontmatter_value() {
+  local file="$1"
+  local key="$2"
+
+  frontmatter "$file" \
+    | awk -F: -v key="$key" '$1 == key { sub(/^[^:]+:[[:space:]]*/, "", $0); print; exit }'
+}
+
+strip_quotes() {
+  local value="${1:-}"
+  value="${value#\"}"
+  value="${value%\"}"
+  printf '%s' "$value"
+}
+
+has_exact_control_line() {
+  local output="$1"
+  local marker="$2"
+
+  printf '%s\n' "$output" \
+    | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+    | grep -Fxq "$marker"
+}
+
 # Get transcript path from hook input (unique per session)
 TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path')
 
@@ -26,7 +55,13 @@ find_session_state_file() {
     [[ -f "$state_file" ]] || continue
 
     local stored_transcript
-    stored_transcript=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$state_file" | grep '^session_transcript:' | sed 's/session_transcript: *//' | sed 's/^"\(.*\)"$/\1/')
+    local active_state
+    active_state=$(strip_quotes "$(frontmatter_value "$state_file" "active")")
+
+    # Paused loops stay paused until explicitly resumed.
+    [[ "$active_state" == "true" ]] || continue
+
+    stored_transcript=$(strip_quotes "$(frontmatter_value "$state_file" "session_transcript")")
 
     # If unclaimed (null or empty), claim it for this session
     if [[ "$stored_transcript" == "null" ]] || [[ -z "$stored_transcript" ]]; then
@@ -62,10 +97,10 @@ if [[ -z "$STATE_FILE" ]] || [[ ! -f "$STATE_FILE" ]]; then
 fi
 
 # Parse frontmatter
-FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE")
+FRONTMATTER=$(frontmatter "$STATE_FILE")
 ITERATION=$(echo "$FRONTMATTER" | grep '^iteration:' | sed 's/iteration: *//')
 MAX_ITERATIONS=$(echo "$FRONTMATTER" | grep '^max_iterations:' | sed 's/max_iterations: *//')
-COMPLETION_PROMISE=$(echo "$FRONTMATTER" | grep '^completion_promise:' | sed 's/completion_promise: *//' | sed 's/^"\(.*\)"$/\1/')
+COMPLETION_PROMISE=$(strip_quotes "$(echo "$FRONTMATTER" | grep '^completion_promise:' | sed 's/completion_promise: *//')")
 SESSION_ID=$(basename "$STATE_FILE" | sed 's/ralph-loop\.\(.*\)\.local\.md/\1/')
 
 # Validate numeric fields
@@ -123,14 +158,14 @@ fi
 
 # Check for completion
 if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
-  PROMISE_TEXT=$(echo "$LAST_OUTPUT" | perl -0777 -pe 's/.*?<promise>(.*?)<\/promise>.*/$1/s; s/^\s+|\s+$//g; s/\s+/ /g' 2>/dev/null || echo "")
-  if [[ -n "$PROMISE_TEXT" ]] && [[ "$PROMISE_TEXT" = "$COMPLETION_PROMISE" ]]; then
+  PROMISE_MARKER="<promise>${COMPLETION_PROMISE}</promise>"
+  if has_exact_control_line "$LAST_OUTPUT" "$PROMISE_MARKER"; then
     echo "Forge loop [$SESSION_ID]: Promise fulfilled."
     rm "$STATE_FILE"
     exit 0
   fi
 else
-  if echo "$LAST_OUTPUT" | grep -q "RALPH_COMPLETE"; then
+  if has_exact_control_line "$LAST_OUTPUT" "RALPH_COMPLETE"; then
     echo "Forge loop [$SESSION_ID]: All targets met. Loop complete."
     rm "$STATE_FILE"
     exit 0
@@ -138,8 +173,8 @@ else
 fi
 
 # Check for pause
-if echo "$LAST_OUTPUT" | grep -q "RALPH_PAUSE"; then
-  echo "Forge loop [$SESSION_ID]: Paused — waiting for user input."
+if has_exact_control_line "$LAST_OUTPUT" "RALPH_PAUSE"; then
+  echo "Forge loop [$SESSION_ID]: Paused - waiting for user input."
   TEMP_FILE="${STATE_FILE}.tmp.$$"
   sed -e "s/^active: .*/active: paused/" -e 's/^session_transcript: .*/session_transcript: null/' "$STATE_FILE" > "$TEMP_FILE"
   mv "$TEMP_FILE" "$STATE_FILE"

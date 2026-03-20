@@ -5,7 +5,7 @@ description: KPI-driven autoregressive codebase improvement loop. Tracks coverag
 
 # The Forge — Autoregressive Codebase Improvement Loop
 
-A structured, KPI-driven, self-correcting loop that tracks coverage/speed/quality with baselines and targets, evaluates with fresh-context subagents (no anchoring bias), rotates strategies when stagnating, and knows when it's done.
+A structured, KPI-driven, self-correcting loop that tracks coverage/speed/quality with baselines and targets, evaluates with fresh-context audits, rotates strategies when stagnating, and knows when it's done.
 
 Built on the Ralph Wiggum loop pattern (Geoff Huntley), informed by Karpathy's autoregressive philosophy and SICA's compounding iteration approach.
 
@@ -67,7 +67,7 @@ Subsequent: compute deltas from previous iteration AND from baseline.
 
 **When**: iteration 1 AND every 3rd iteration thereafter (1, 4, 7, 10...).
 
-Spawn a subagent (pentest-analyst, architecture-reviewer, or code-refactorer depending on scope) with:
+Spawn a fresh-context audit using an agent or persona available in your environment (for example a code reviewer, security auditor, or refactorer) with:
 - ONLY the scope files/modules
 - Prompt: "Audit [scope]. Report findings by severity (high/medium/low). No context about KPI targets or iteration state."
 - NO forge state, NO iteration context, NO KPI targets — unbiased evaluation
@@ -126,15 +126,15 @@ This prevents complexity ratchet. Code removal for equivalent performance is alw
 
 Each iteration does ONE thing well:
 
-- **Structural refactoring** → spawn `code-refactorer` agent (small steps, tests between)
-- **Clarity/polish** → spawn `code-simplifier` agent (post-refactor)
+- **Structural refactoring** → use an available refactoring agent, or do the focused change directly
+- **Clarity/polish** → use an available simplification/review agent, or do the focused change directly
 - **Coverage gaps** → write tests + refactor for testability
 - **Speed optimization** → convert sync to async tests, consolidate fixtures, reduce DB hits
 - **Dead code removal** → delete unused code flagged by evaluation
 - **Design system** → extract shared components (badges, cards, indicators)
 - **Simplification** → delete dead code, reduce abstractions, flatten indirection
 
-Use subagents for heavy lifting to preserve main context window.
+Use fresh-context agents when they are available and helpful; otherwise keep the change focused and do it directly.
 
 ### F. VERIFY — Tests Must Be Green
 
@@ -167,7 +167,8 @@ Update `.claude/forge-state.SESSION.md`:
    - Commit with: `forge(N): [strategy] — [brief description]`
 
 5. **Clean revert** if tests red or KPIs regressed AND no commit:
-   - `git checkout -- .` to restore clean state
+   - Revert only the files changed in the current iteration
+   - If you cannot identify that set safely, stop and leave unrelated local work untouched
    - Record what was attempted in the iteration log (even failed attempts inform future decisions)
 
 6. **Ideas backlog** — if the iteration surfaced promising but deferred opportunities:
@@ -182,7 +183,7 @@ Check ALL conditions simultaneously:
 - failures == 0
 - high_findings == 0 (from last evaluation)
 
-If ALL met → output `RALPH_COMPLETE`
+If ALL met → output `RALPH_COMPLETE` on its own line
 If not → exit normally (stop hook re-injects prompt for next iteration)
 
 ## Stagnation Protocol
@@ -262,7 +263,7 @@ ideas:
 1. **ONE change per iteration** — resist the urge to batch. Small steps compound.
 2. **Never skip VERIFY** — red tests mean the iteration failed. Fix before RECORD.
 3. **Never fabricate KPIs** — always parse from actual test runner output.
-4. **Subagents for evaluation** — fresh context prevents anchoring bias.
+4. **Fresh-context evaluation** — use an available isolated reviewer/audit pass to avoid anchoring bias.
 5. **Lessons accumulate** — read ALL previous lessons before DECIDE. Never repeat a documented failure.
 6. **Commit on green** — every improvement gets persisted to git.
 7. **State file is sacred** — it survives context compaction. Keep it accurate.
