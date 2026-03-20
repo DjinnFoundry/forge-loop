@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `/forge-cancel` as the primary Claude Code stop command, with `/cancel-ralph` kept as a legacy alias
+
+### Changed
+- Forge now uses `FORGE_COMPLETE` and `FORGE_PAUSE` as the primary control markers while still accepting legacy Ralph markers
+- Claude driver docs and install flow now use Forge-first naming and `forge-loop.*.local.md` as the primary loop-state file name
+- README positioning now keeps Ralph and other influences in an explicit lineage section instead of mixing them into the main product surface
+
 ## [0.5.1] - 2026-03-20
 
 ### Fixed

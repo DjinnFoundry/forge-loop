@@ -43,7 +43,7 @@ state_field() {
   local repo_dir="$1"
   local field="$2"
 
-  sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "${repo_dir}/.claude/ralph-loop.test.local.md" \
+  sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "${repo_dir}/.claude/forge-loop.test.local.md" \
     | awk -F: -v field="$field" '$1 == field { sub(/^[^:]+:[[:space:]]*/, "", $0); gsub(/^"|"$/, "", $0); print; exit }'
 }
 
@@ -52,8 +52,9 @@ write_state() {
   local active="$2"
   local iteration="$3"
   local completion_promise="$4"
+  local state_name="${5:-forge-loop.test.local.md}"
 
-  cat > "${repo_dir}/.claude/ralph-loop.test.local.md" <<EOF
+  cat > "${repo_dir}/.claude/${state_name}" <<EOF
 ---
 active: ${active}
 session_id: "test"
@@ -141,13 +142,13 @@ test_embedded_complete_marker_does_not_finish() {
 test_exact_complete_marker_finishes() {
   local repo_dir="$1"
   write_state "${repo_dir}" "true" "1" "null"
-  write_transcript "${repo_dir}" "RALPH_COMPLETE"
+  write_transcript "${repo_dir}" "FORGE_COMPLETE"
 
   local output
   output="$(run_hook "${repo_dir}")"
 
   assert_contains "$output" "Loop complete." "exact completion marker should finish the loop"
-  if [[ -f "${repo_dir}/.claude/ralph-loop.test.local.md" ]]; then
+  if [[ -f "${repo_dir}/.claude/forge-loop.test.local.md" ]]; then
     fail "exact completion marker should delete the state file"
   fi
 }
@@ -168,7 +169,7 @@ test_embedded_pause_marker_does_not_pause() {
 test_exact_pause_marker_pauses() {
   local repo_dir="$1"
   write_state "${repo_dir}" "true" "1" "null"
-  write_transcript "${repo_dir}" "RALPH_PAUSE"
+  write_transcript "${repo_dir}" "FORGE_PAUSE"
 
   local output
   output="$(run_hook "${repo_dir}")"
@@ -212,7 +213,7 @@ test_exact_promise_marker_finishes() {
   output="$(run_hook "${repo_dir}")"
 
   assert_contains "$output" "Promise fulfilled." "exact promise marker should finish the loop"
-  if [[ -f "${repo_dir}/.claude/ralph-loop.test.local.md" ]]; then
+  if [[ -f "${repo_dir}/.claude/forge-loop.test.local.md" ]]; then
     fail "exact promise marker should delete the state file"
   fi
 }
@@ -229,6 +230,20 @@ test_symlinked_hook_resolves_helper_library() {
   assert_equals "2" "$(state_field "${repo_dir}" "iteration")" "symlinked hook should increment iteration"
 }
 
+test_legacy_ralph_markers_and_state_files_still_work() {
+  local repo_dir="$1"
+  write_state "${repo_dir}" "true" "1" "null" "ralph-loop.test.local.md"
+  write_transcript "${repo_dir}" "RALPH_COMPLETE"
+
+  local output
+  output="$(run_hook "${repo_dir}")"
+
+  assert_contains "$output" "Loop complete." "legacy Ralph completion marker should still finish the loop"
+  if [[ -f "${repo_dir}/.claude/ralph-loop.test.local.md" ]]; then
+    fail "legacy Ralph state file should be deleted on completion"
+  fi
+}
+
 main() {
   with_repo test_regular_output_continues
   with_repo test_embedded_complete_marker_does_not_finish
@@ -239,6 +254,7 @@ main() {
   with_repo test_embedded_promise_marker_does_not_finish
   with_repo test_exact_promise_marker_finishes
   with_repo test_symlinked_hook_resolves_helper_library
+  with_repo test_legacy_ralph_markers_and_state_files_still_work
 
   echo "stop-hook tests passed"
 }

@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Forge Loop Stop Hook
-# Prevents session exit when a forge/ralph loop is active
+# Prevents session exit when a forge loop is active
 # Feeds the prompt back as input to continue the loop
-# Compatible with Ralph Wiggum loops (same state file format)
+# Compatible with legacy Ralph loop control markers and state files
 
 set -euo pipefail
 
@@ -38,16 +38,24 @@ TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path')
 
 # Cleanup stale state files (older than 24 hours)
 cleanup_stale_files() {
-  find .claude -maxdepth 1 -name 'ralph-loop.*.local.md' -mmin +1440 -delete 2>/dev/null || true
+  find .claude -maxdepth 1 \( -name 'forge-loop.*.local.md' -o -name 'ralph-loop.*.local.md' \) -mmin +1440 -delete 2>/dev/null || true
+}
+
+loop_state_candidates() {
+  local state_file
+
+  for state_file in .claude/forge-loop.*.local.md .claude/ralph-loop.*.local.md; do
+    [[ -f "$state_file" ]] || continue
+    printf '%s\n' "$state_file"
+  done
 }
 
 # Find state file for current session
 find_session_state_file() {
   local transcript="$1"
+  local state_file
 
-  for state_file in .claude/ralph-loop.*.local.md; do
-    [[ -f "$state_file" ]] || continue
-
+  while IFS= read -r state_file; do
     local stored_transcript
     local active_state
     active_state=$(forge_strip_quotes "$(forge_frontmatter_value "$state_file" "active")")
@@ -71,7 +79,7 @@ find_session_state_file() {
       echo "$state_file"
       return 0
     fi
-  done
+  done < <(loop_state_candidates)
 
   echo ""
   return 0
@@ -95,7 +103,7 @@ FRONTMATTER=$(forge_frontmatter "$STATE_FILE")
 ITERATION=$(echo "$FRONTMATTER" | grep '^iteration:' | sed 's/iteration: *//')
 MAX_ITERATIONS=$(echo "$FRONTMATTER" | grep '^max_iterations:' | sed 's/max_iterations: *//')
 COMPLETION_PROMISE=$(forge_strip_quotes "$(echo "$FRONTMATTER" | grep '^completion_promise:' | sed 's/completion_promise: *//')")
-SESSION_ID=$(basename "$STATE_FILE" | sed 's/ralph-loop\.\(.*\)\.local\.md/\1/')
+SESSION_ID="$(basename "$STATE_FILE" | sed -E 's/^(forge|ralph)-loop\.(.*)\.local\.md$/\2/')"
 
 # Validate numeric fields
 if [[ ! "$ITERATION" =~ ^[0-9]+$ ]]; then
@@ -159,7 +167,7 @@ if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
     exit 0
   fi
 else
-  if has_exact_control_line "$LAST_OUTPUT" "RALPH_COMPLETE"; then
+  if has_exact_control_line "$LAST_OUTPUT" "FORGE_COMPLETE" || has_exact_control_line "$LAST_OUTPUT" "RALPH_COMPLETE"; then
     echo "Forge loop [$SESSION_ID]: All targets met. Loop complete."
     rm "$STATE_FILE"
     exit 0
@@ -167,7 +175,7 @@ else
 fi
 
 # Check for pause
-if has_exact_control_line "$LAST_OUTPUT" "RALPH_PAUSE"; then
+if has_exact_control_line "$LAST_OUTPUT" "FORGE_PAUSE" || has_exact_control_line "$LAST_OUTPUT" "RALPH_PAUSE"; then
   echo "Forge loop [$SESSION_ID]: Paused - waiting for user input."
   TEMP_FILE="${STATE_FILE}.tmp.$$"
   sed -e "s/^active: .*/active: paused/" -e 's/^session_transcript: .*/session_transcript: null/' "$STATE_FILE" > "$TEMP_FILE"
@@ -192,14 +200,14 @@ sed "s/^iteration: .*/iteration: $NEXT_ITERATION/" "$STATE_FILE" > "$TEMP_FILE"
 mv "$TEMP_FILE" "$STATE_FILE"
 
 # Build system message
-PAUSE_HINT="To pause for user input: output RALPH_PAUSE."
+PAUSE_HINT="To pause for user input: output FORGE_PAUSE."
 STUCK_HINT="If stuck, try a different approach — do not repeat the same failing strategy."
 DIRECT_HINT="Output markers DIRECTLY in your response — do not quote them or say you 'will' output them."
 
 if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ -n "$COMPLETION_PROMISE" ]]; then
   SYSTEM_MSG="Forge [$SESSION_ID] iteration $NEXT_ITERATION | To stop: output <promise>$COMPLETION_PROMISE</promise> (ONLY when TRUE). $DIRECT_HINT $PAUSE_HINT $STUCK_HINT"
 else
-  SYSTEM_MSG="Forge [$SESSION_ID] iteration $NEXT_ITERATION | To stop: output RALPH_COMPLETE when all targets are met. $DIRECT_HINT $PAUSE_HINT $STUCK_HINT"
+  SYSTEM_MSG="Forge [$SESSION_ID] iteration $NEXT_ITERATION | To stop: output FORGE_COMPLETE when all targets are met. $DIRECT_HINT $PAUSE_HINT $STUCK_HINT"
 fi
 
 jq -n \

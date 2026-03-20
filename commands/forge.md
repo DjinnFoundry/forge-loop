@@ -40,7 +40,7 @@ If SCOPE is missing, ask what area to focus on.
    - speed: `--speed -N%` if provided, compute `baseline_speed * (1 - N/100)`, else `baseline_speed * 0.8`
    - quality: `--quality` value or "moderate"
 5. **Create forge state file**: `.claude/forge-state.SESSION.md` with success contract + baseline + targets
-6. **Create loop state file**: `.claude/ralph-loop.SESSION.local.md` with forge prompt
+6. **Create loop state file**: `.claude/forge-loop.SESSION.local.md` with forge prompt
 7. **Report** baseline, targets, and begin first iteration
 
 ## Loop Prompt (written to state file)
@@ -60,20 +60,20 @@ D. DECIDE - Pick strategy from KPI gaps + findings + lessons
 E. EXECUTE - ONE focused change using appropriate subagent
 F. VERIFY - Tests must be green, re-measure with coverage
 G. RECORD - Update forge-state with deltas + lessons (autoregressive step)
-H. COMPLETE - Task success contract satisfied AND KPI targets met? → output RALPH_COMPLETE on its own line
+H. COMPLETE - Task success contract satisfied AND KPI targets met? → output FORGE_COMPLETE on its own line
 
 Refer to the forge skill for the full protocol.
 
 CRITICAL: Do NOT skip steps. Do NOT batch multiple changes. ONE change per iteration.
 CRITICAL: Parse KPIs from actual test output. Never fabricate numbers.
 CRITICAL: If tests are red after EXECUTE, fix before RECORD.
-CRITICAL: Output control markers (`RALPH_COMPLETE`, `RALPH_PAUSE`, `<promise>...</promise>`) on their own line.
+CRITICAL: Output control markers (`FORGE_COMPLETE`, `FORGE_PAUSE`, `<promise>...</promise>`) on their own line.
 ```
 
 ## Completion
 
 The forge loop exits via the stop hook mechanism:
-- `RALPH_COMPLETE` when all KPI targets met simultaneously
-- `RALPH_PAUSE` if user input needed
+- `FORGE_COMPLETE` when the task success contract and KPI targets are satisfied
+- `FORGE_PAUSE` if user input is needed
 - `--max-iterations` safety limit
-- `/cancel-ralph` to stop manually
+- `/forge-cancel` to stop manually

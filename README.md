@@ -18,12 +18,12 @@
 
 # forge-loop
 
-**Forge Core with first-class drivers for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex/manual workflows.**
+**A task loop with KPI guardrails for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex/manual workflows.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.5.1-green.svg)](CHANGELOG.md)
 
-Forge is a protocol plus adapters. The protocol defines task success, KPI guardrails, state, strategy rotation, evaluation cadence, and completion rules. The bundled drivers make that protocol run inside Claude Code and Codex/manual workflows.
+Forge is a protocol plus adapters. It takes open-text software tasks, keeps coverage/speed/quality as guardrails, records state across iterations, and runs until the work is honestly done or you stop it.
 
 ```
 You: /forge "password reset flow" --done-when "users can request and complete a reset end-to-end" --coverage 90 --speed -30%
@@ -36,6 +36,15 @@ Forge: Measuring baseline... 85.2% coverage, 120s
 ```
 
 ---
+
+## What Forge Is
+
+Forge is for cases where plain prompting is too loose but a full agent framework is too heavy.
+
+- Give it a task
+- optionally say what "done" means
+- keep tests, coverage, speed, and quality in view
+- iterate with recorded state instead of re-explaining yourself every round
 
 ## Core vs Driver
 
@@ -55,7 +64,7 @@ The portable part of the system:
 The bundled runtime adapter in this repo:
 
 - `/forge` command
-- `/cancel-ralph` command
+- `/forge-cancel` command
 - `/forge-status` command
 - `agents/forge.md`
 - `hooks/stop-hook.sh`
@@ -89,13 +98,17 @@ Forge is not claiming native parity across agent runtimes. It ships two real dri
 
 ---
 
-## Standing on the shoulders of
+## Lineage
 
-- **Ralph Wiggum** — [Geoff Huntley's](https://ghuntley.com/ralph/) foundational work on autonomous AI development loops. Fresh context per iteration, files as message bus, backpressure as the quality mechanism. "Deterministically bad in an undeterministic world, but eventually consistent." Forge is our implementation of the Ralph loop pattern with structured KPI tracking and strategy rotation.
-- **Andrej Karpathy** — [autoresearch](https://github.com/karpathy/autoresearch): 700 experiments in 2 days, ~20 additive improvements, 11% efficiency gain. The simplicity criterion ("code deletion for equivalent performance is always a win"), binary keep/discard with git reset, `program.md` as a "super lightweight skill", and "NEVER STOP" philosophy shaped forge's core design.
-- **Tobi Lutke & David Cortes** — [pi-autoresearch](https://github.com/davebcn87/pi-autoresearch): generalized the autoresearch pattern beyond ML to any software optimization. Noise estimation via MAD-based confidence scoring, backpressure checks (correctness gates separate from metric timing), persistent state via JSONL, and the ideas backlog pattern. Lutke's [context engineering](https://x.com/tobi/status/1909251946235437514) philosophy — "the art of providing all the context for the task to be plausibly solvable by the LLM" — is what makes loops work. 120 experiments on Shopify's Liquid yielded 53% faster parse+render.
-- **SICA** (Self-Improving Coding Agent, [arxiv.org/abs/2504.15228](https://arxiv.org/abs/2504.15228)) — Demonstrated that compounding iterations (17% to 53% SWE-Bench) work when the agent selects the best strategy from an archive of accumulated evidence.
-- **autoresearch-mlx** — [trevin-creator](https://github.com/trevin-creator/autoresearch-mlx): not just a port but genuine architectural innovation. The agent autonomously discovered that depth=4 beats depth=8 under time-budget constraints. Nobody improved the loop itself across 4 forks — the largest untapped opportunity that forge addresses.
+Forge is not pretending to emerge from nowhere.
+
+- **Ralph Wiggum** — [Geoff Huntley](https://ghuntley.com/ralph/) gave the core loop shape: fresh context, file-backed iteration, and the willingness to let simple loops do real work.
+- **autoresearch** — [Andrej Karpathy](https://github.com/karpathy/autoresearch) reinforced the deletion bias, binary keep/discard discipline, and the value of tiny, explicit skills.
+- **pi-autoresearch** — [Tobi Lutke and David Cortes](https://github.com/davebcn87/pi-autoresearch) pushed the pattern toward measurable software work beyond ML and made the backlog / measurement story sharper.
+- **SICA** — [Self-Improving Coding Agent](https://arxiv.org/abs/2504.15228) showed that compounding improvement works better when strategy selection learns from prior evidence.
+- **autoresearch-mlx** — [trevin-creator](https://github.com/trevin-creator/autoresearch-mlx) showed the loop itself can be a target of improvement, not just the code under test.
+
+Forge’s job is not to erase those influences. It is to package them into a cleaner, more practical tool surface.
 
 ---
 
@@ -163,17 +176,20 @@ cd forge-loop
 
 The installer symlinks the Claude Code driver assets into your `~/.claude/` directory.
 
-**Important**: You also need to configure the stop hook that drives iteration. See [hooks/README.md](hooks/README.md) for setup instructions. If you already have the Ralph Wiggum stop hook configured, forge works with it automatically.
+**Important**: You also need to configure the stop hook that drives iteration. See [hooks/README.md](hooks/README.md) for setup instructions.
 
 ### Manual installation
 
 ```bash
-mkdir -p ~/.claude/skills/forge ~/.claude/commands ~/.claude/agents
+mkdir -p ~/.claude/skills/forge ~/.claude/commands ~/.claude/agents ~/.claude/hooks
 
 cp skills/forge/SKILL.md ~/.claude/skills/forge/SKILL.md
 cp commands/forge.md ~/.claude/commands/forge.md
+cp commands/forge-cancel.md ~/.claude/commands/forge-cancel.md
 cp commands/cancel-ralph.md ~/.claude/commands/cancel-ralph.md
+cp commands/forge-status.md ~/.claude/commands/forge-status.md
 cp agents/forge.md ~/.claude/agents/forge.md
+cp hooks/stop-hook.sh ~/.claude/hooks/stop-hook.sh
 
 # Stop hook — see hooks/README.md for settings.json setup
 ```
@@ -244,8 +260,8 @@ Driver safety:
 
 #### Control
 
-- **Pause**: Forge outputs `RALPH_PAUSE` when it needs your input
-- **Cancel**: `/cancel-ralph` stops the loop
+- **Pause**: Forge outputs `FORGE_PAUSE` when it needs your input
+- **Cancel**: `/forge-cancel` stops the loop
 - **Status**: `/forge-status` reports the current Claude driver session state
 - **Inspect state**: `.claude/forge-state.SESSION.md` is preserved when you pause or cancel
 
@@ -265,6 +281,10 @@ Forge persists its state in driver-specific roots:
 
 - Claude Code: `.claude/forge-state.SESSION.md`
 - Codex: `.codex/forge/forge-state.SESSION.md`
+
+Claude’s loop driver uses `.claude/forge-loop.SESSION.local.md` as the primary
+loop-state file name. Legacy `.claude/ralph-loop.SESSION.local.md` files are
+still accepted for compatibility.
 
 Other runtimes can reuse the same format in a different state root. Each iteration appends its KPIs, strategy, actions, and lessons. This is the autoregressive memory.
 
@@ -320,7 +340,8 @@ ideas:
 forge-loop/
 ├── skills/forge/SKILL.md    ← The protocol (source of truth)
 ├── commands/forge.md         ← Claude Code /forge command
-├── commands/cancel-ralph.md  ← Stops the active loop in this project
+├── commands/forge-cancel.md   ← Primary Claude stop command
+├── commands/cancel-ralph.md   ← Legacy alias for compatibility
 ├── commands/forge-status.md  ← Shows Claude driver session status
 ├── drivers/codex/            ← Codex/manual driver scripts + prompt template
 │   ├── bin/
@@ -346,13 +367,13 @@ forge-loop/
 └── README.md
 ```
 
-The runtime layout is intentionally asymmetric: the protocol is portable, while drivers map that protocol to their runtime's real affordances. The Claude driver uses the Ralph loop pattern and a stop hook. The Codex driver uses explicit shell entrypoints and project-local state files. Both preserve the same Forge Core semantics.
+The runtime layout is intentionally asymmetric: the protocol is portable, while drivers map that protocol to their runtime's real affordances. The Claude driver uses a stop hook and loop-state files. The Codex driver uses explicit shell entrypoints and project-local state files. Both preserve the same Forge Core semantics.
 
 ---
 
 ## Design Principles
 
-Distilled from studying autoresearch, Ralph Wiggum, pi-autoresearch, SICA, and a dozen forks:
+Distilled from Ralph, autoresearch, pi-autoresearch, SICA, and a dozen related loops:
 
 1. **Loops are simple. The magic is in the loop.** The universal pattern is: Modify, Measure, Compare, Keep/Discard, Record, Repeat. Everything else is details.
 2. **Simpler is better.** Code deletion at same KPIs is always a win. Don't add complexity for marginal gains.

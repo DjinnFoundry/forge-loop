@@ -7,7 +7,7 @@ description: Forge Core protocol plus Claude Code and Codex/manual drivers for t
 
 A structured, task-driven improvement protocol with KPI guardrails. Forge tracks coverage/speed/quality with baselines and targets, derives or records success criteria for the task itself, evaluates with fresh-context audits, rotates strategies when stagnating, and records lessons across iterations.
 
-Built on the Ralph Wiggum loop pattern (Geoff Huntley), informed by Karpathy's autoregressive philosophy and SICA's compounding iteration approach.
+Built on the Ralph Wiggum loop pattern (Geoff Huntley), informed by Karpathy's autoregressive philosophy, pi-autoresearch's measurement discipline, and SICA's compounding iteration approach.
 
 ## Activation Triggers
 - "forge it", "forge this", "forge loop"
@@ -26,8 +26,9 @@ Forge Core
 
 Claude Code driver
   ├── /forge command
+  ├── /forge-cancel command
   ├── .claude/forge-state.SESSION.md
-  ├── .claude/ralph-loop.SESSION.local.md
+  ├── .claude/forge-loop.SESSION.local.md
   └── Stop hook re-injects prompt on session exit
 
 Each iteration (one OODA cycle):
@@ -38,7 +39,7 @@ Each iteration (one OODA cycle):
   ├── E. EXECUTE  — Apply ONE focused transformation
   ├── F. VERIFY   — Run tests, re-measure KPIs
   ├── G. RECORD   — Update forge-state with deltas + lessons
-  └── H. COMPLETE — All targets met simultaneously? → RALPH_COMPLETE
+  └── H. COMPLETE — Task success + KPI guardrails satisfied? → FORGE_COMPLETE
 ```
 
 ## Driver model
@@ -235,7 +236,7 @@ Check ALL conditions simultaneously:
 - failures == 0
 - high_findings == 0 (from last evaluation)
 
-If ALL met → output `RALPH_COMPLETE` on its own line
+If ALL met → output `FORGE_COMPLETE` on its own line
 If not → exit normally (stop hook re-injects prompt for next iteration)
 
 ## Stagnation Protocol

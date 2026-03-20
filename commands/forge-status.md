@@ -8,7 +8,9 @@ Show the current Claude Code driver status for this project.
 
 ## Instructions
 
-1. Look for `.claude/ralph-loop.*.local.md` and matching `.claude/forge-state.*.md` files.
+1. Look for loop state files in this order and match them to `.claude/forge-state.*.md` files:
+   - `.claude/forge-loop.*.local.md`
+   - `.claude/ralph-loop.*.local.md` as a legacy compatibility fallback
 2. If no loop state files exist, say there is no active or paused Claude driver session.
 3. If multiple loop state files exist:
    - list them
