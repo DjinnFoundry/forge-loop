@@ -77,6 +77,17 @@ Record findings count by severity in forge-state.
 
 ### D. DECIDE — Pick Strategy
 
+#### The Simplicity Criterion
+
+All else being equal, simpler is better. When evaluating whether to keep a change:
+
+- Improvement + ugly complexity → probably discard
+- Improvement from DELETING code → definitely keep
+- No metric change + simpler code → keep (that's a simplification win)
+- Marginal gain from complexity → reject
+
+This prevents complexity ratchet. Code removal for equivalent performance is always a win.
+
 #### Available Strategies
 
 | Strategy | When to use | Typical impact |
@@ -88,6 +99,7 @@ Record findings count by severity in forge-state.
 | `dead-code-removal` | Unused code flagged by reality-check | Quality + coverage |
 | `quality-polish` | Naming, complexity, clarity issues | Quality |
 | `design-system` | Duplicated UI patterns, status badges | Quality + coverage |
+| `simplification` | Complex code that can be made simpler | Quality (+ coverage if tests improve) |
 
 #### Selection Logic
 
@@ -120,6 +132,7 @@ Each iteration does ONE thing well:
 - **Speed optimization** → convert sync to async tests, consolidate fixtures, reduce DB hits
 - **Dead code removal** → delete unused code flagged by evaluation
 - **Design system** → extract shared components (badges, cards, indicators)
+- **Simplification** → delete dead code, reduce abstractions, flatten indirection
 
 Use subagents for heavy lifting to preserve main context window.
 
@@ -153,6 +166,14 @@ Update `.claude/forge-state.SESSION.md`:
    - Stage changed files (NOT forge-state, it's in .claude/)
    - Commit with: `forge(N): [strategy] — [brief description]`
 
+5. **Clean revert** if tests red or KPIs regressed AND no commit:
+   - `git checkout -- .` to restore clean state
+   - Record what was attempted in the iteration log (even failed attempts inform future decisions)
+
+6. **Ideas backlog** — if the iteration surfaced promising but deferred opportunities:
+   - Add to the `ideas` list in forge-state frontmatter
+   - On future iterations, review backlog for combination opportunities
+
 ### H. COMPLETE — All Targets Met?
 
 Check ALL conditions simultaneously:
@@ -174,6 +195,17 @@ if stagnation_count >= 3:
   4. Reset stagnation_count to 0
   5. Record lesson: "'{old}' exhausted after iterations [X,Y,Z], switching to '{new}'"
 ```
+
+### Getting Unstuck
+
+When stagnation triggers (or when you run out of ideas within a strategy):
+
+1. **Re-read scope files** — fresh eyes find new angles
+2. **Review the ideas backlog** — deferred opportunities may be ripe now
+3. **Combine near-misses** — two changes that individually didn't help may compound
+4. **Try the inverse** — if adding X didn't help, try removing it (or vice versa)
+5. **Think harder** — don't stop and ask. Read related code, look for patterns, try more radical changes
+6. **Simplification pass** — can you delete code and maintain the same KPIs? That's a win
 
 ## Forge State File Format
 
@@ -203,6 +235,9 @@ strategies_tried:
     speed_delta: -5
 lessons:
   - "async:true on LiveView tests saves ~3s per file"
+ideas:
+  - "consolidate 3 similar fixture helpers into one parameterized function"
+  - "auth module has dead code paths from v1 migration"
 ---
 
 ## Iteration 1 — coverage-push
@@ -231,3 +266,6 @@ lessons:
 5. **Lessons accumulate** — read ALL previous lessons before DECIDE. Never repeat a documented failure.
 6. **Commit on green** — every improvement gets persisted to git.
 7. **State file is sacred** — it survives context compaction. Keep it accurate.
+8. **Simpler is better** — code deletion at same KPIs is always a win. Don't add complexity for marginal gains.
+9. **Clean revert on failure** — restore clean state before the next iteration. Never leave dirty files.
+10. **Never stop to ask** — if stuck, think harder. Re-read code, review backlog, combine near-misses, try the inverse.

@@ -21,7 +21,7 @@
 **Autoregressive codebase improvement for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](CHANGELOG.md)
 
 A structured, KPI-driven, self-correcting loop that tracks metrics (coverage, speed, quality), evaluates with fresh-context subagents, rotates strategies when stagnating, and knows when it's done.
 
@@ -38,10 +38,11 @@ Forge: Measuring baseline... 85.2% coverage, 120s
 
 ## Standing on the shoulders of
 
-- **Ralph Wiggum** — [Geoff Huntley's](https://ghuntley.com/ralph/) foundational work on autonomous AI development loops. "Deterministically bad in an undeterministic world, but eventually consistent." Forge is our implementation of the Ralph loop pattern with structured KPI tracking and strategy rotation.
-- **Andrej Karpathy** — The autoregressive mindset: each output becomes the next input. Karpathy's work on autoregressive models and his advocacy for [vibe coding](https://x.com/karpathy/status/1886192184808149383) informed forge's core loop design — each iteration's KPIs, findings, and lessons become the next iteration's decision context.
-- **Tobi Lutke** — His emphasis on tight feedback loops, continuous iteration, and measuring everything resonated deeply with our approach to autonomous improvement.
-- **SICA** (Self-Improving Coding Agent, [ICLR 2025 SSI-FM Workshop](https://openreview.net/forum?id=gXVQdNXqoc)) — Demonstrated that compounding iterations (17% to 53% SWE-Bench) work when the agent can select strategies based on accumulated evidence.
+- **Ralph Wiggum** — [Geoff Huntley's](https://ghuntley.com/ralph/) foundational work on autonomous AI development loops. Fresh context per iteration, files as message bus, backpressure as the quality mechanism. "Deterministically bad in an undeterministic world, but eventually consistent." Forge is our implementation of the Ralph loop pattern with structured KPI tracking and strategy rotation.
+- **Andrej Karpathy** — [autoresearch](https://github.com/karpathy/autoresearch): 700 experiments in 2 days, ~20 additive improvements, 11% efficiency gain. The simplicity criterion ("code deletion for equivalent performance is always a win"), binary keep/discard with git reset, `program.md` as a "super lightweight skill", and "NEVER STOP" philosophy shaped forge's core design.
+- **Tobi Lutke & David Cortes** — [pi-autoresearch](https://github.com/davebcn87/pi-autoresearch): generalized the autoresearch pattern beyond ML to any software optimization. Noise estimation via MAD-based confidence scoring, backpressure checks (correctness gates separate from metric timing), persistent state via JSONL, and the ideas backlog pattern. Lutke's [context engineering](https://x.com/tobi/status/1909251946235437514) philosophy — "the art of providing all the context for the task to be plausibly solvable by the LLM" — is what makes loops work. 120 experiments on Shopify's Liquid yielded 53% faster parse+render.
+- **SICA** (Self-Improving Coding Agent, [arxiv.org/abs/2504.15228](https://arxiv.org/abs/2504.15228)) — Demonstrated that compounding iterations (17% to 53% SWE-Bench) work when the agent selects the best strategy from an archive of accumulated evidence.
+- **autoresearch-mlx** — [trevin-creator](https://github.com/trevin-creator/autoresearch-mlx): not just a port but genuine architectural innovation. The agent autonomously discovered that depth=4 beats depth=8 under time-budget constraints. Nobody improved the loop itself across 4 forks — the largest untapped opportunity that forge addresses.
 
 ---
 
@@ -75,6 +76,7 @@ Forge selects from named strategies based on which KPI gap is largest:
 | `dead-code-removal` | Unused code flagged by evaluation | Quality + Coverage |
 | `quality-polish` | Naming, complexity, clarity | Quality |
 | `design-system` | Duplicated UI patterns | Quality + Coverage |
+| `simplification` | Code that can be made simpler | Quality |
 
 ### Stagnation Detection
 
@@ -170,6 +172,8 @@ strategies_tried:
     speed_delta: -5
 lessons:
   - "async:true on controller tests saves ~3s per file"
+ideas:
+  - "auth module has dead code paths worth investigating"
 ---
 
 ## Iteration 1 — coverage-push
@@ -200,6 +204,21 @@ forge-loop/
 ```
 
 The iteration engine uses the Ralph loop pattern: each time the Claude Code session tries to exit, the stop hook re-injects the forge prompt. The forge state file provides continuity across iterations and context compactions.
+
+---
+
+## Design Principles
+
+Distilled from studying autoresearch, Ralph Wiggum, pi-autoresearch, SICA, and a dozen forks:
+
+1. **Loops are simple. The magic is in the loop.** The universal pattern is: Modify, Measure, Compare, Keep/Discard, Record, Repeat. Everything else is details.
+2. **Simpler is better.** Code deletion at same KPIs is always a win. Don't add complexity for marginal gains.
+3. **Autonomy scales when you constrain scope, clarify success, and mechanize verification.** Tests aren't just QA — they're the rails the loop runs on.
+4. **Binary keep/discard.** Improved? Keep. Didn't? Revert. No gray area, no partial credit.
+5. **State survives context.** The forge-state file is the autoregressive memory. It survives context compaction, agent restarts, and session swaps.
+6. **Fresh eyes beat anchored ones.** Subagents with no iteration context prevent "the numbers look fine" bias.
+7. **Think harder, don't stop.** When stuck: re-read code, review backlog, combine near-misses, try the inverse, try simplification. Never pause to ask.
+8. **Each improvement should make future improvements easier.** (Addy Osmani)
 
 ---
 
