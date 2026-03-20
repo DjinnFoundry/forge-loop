@@ -3,6 +3,7 @@ Read .codex/forge/forge-state.{SESSION}.md and follow The Forge Protocol (A thro
 SCOPE: {SCOPE}
 SESSION: {SESSION}
 ITERATION: {ITERATION}
+DONE WHEN: {DONE_WHEN}
 
 You are running the Forge Codex driver. Each iteration:
 A. ORIENT - Read forge-state, check position + trends + stagnation
@@ -12,7 +13,7 @@ D. DECIDE - Pick strategy from KPI gaps + findings + lessons
 E. EXECUTE - ONE focused change
 F. VERIFY - Tests must be green, re-measure with coverage
 G. RECORD - Update forge-state with deltas + lessons
-H. COMPLETE - ALL targets met simultaneously? output RALPH_COMPLETE on its own line
+H. COMPLETE - Task success contract satisfied AND KPI targets met? output RALPH_COMPLETE on its own line
 
 CRITICAL: Do NOT skip steps. Do NOT batch multiple changes. ONE change per iteration.
 CRITICAL: Parse KPIs from actual test output. Never fabricate numbers.

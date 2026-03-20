@@ -47,14 +47,16 @@ test_codex_init_continue_cancel() {
   repo_dir="$(mktemp -d)"
   (
     cd "$repo_dir"
-    output_init="$("$INIT_PATH" "API controllers" --coverage 90 --speed -30% --quality strict --max-iterations 5)"
+    output_init="$("$INIT_PATH" "API controllers" --done-when "reset flow works end-to-end" --coverage 90 --speed -30% --quality strict --max-iterations 5)"
     assert_contains "$output_init" "Initialized Forge Codex driver session" "forge-init should initialize a session"
     session_id="$(printf '%s\n' "$output_init" | awk '/Initialized Forge Codex driver session/ {print $6}' | tr -d '.')"
     assert_file ".codex/forge/forge-state.${session_id}.md" "forge-init should create Forge state"
     assert_file ".codex/forge/loop-state.${session_id}.md" "forge-init should create loop state"
+    assert_contains "$(cat ".codex/forge/forge-state.${session_id}.md")" 'done_when: "reset flow works end-to-end"' "forge-init should persist explicit done_when"
 
     output_continue="$("$CONTINUE_PATH" "$session_id")"
     assert_contains "$output_continue" "iteration 1" "forge-continue should report current iteration before incrementing"
+    assert_contains "$output_continue" "DONE WHEN: reset flow works end-to-end" "forge-continue should render explicit done_when into the prompt"
     next_iteration="$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' ".codex/forge/loop-state.${session_id}.md" | awk -F: '$1=="iteration" { sub(/^[^:]+:[[:space:]]*/, "", $0); print; exit }')"
     assert_equals "1" "$next_iteration" "forge-continue should align loop state with the next required recorded iteration"
 
@@ -74,6 +76,32 @@ EOF
     assert_contains "$output_cancel" "Cancelled Forge Codex driver session ${session_id}." "forge-cancel should cancel the session"
     [[ ! -f ".codex/forge/loop-state.${session_id}.md" ]] || fail "forge-cancel should remove loop state"
     assert_file ".codex/forge/forge-state.${session_id}.md" "forge-cancel should preserve Forge state"
+  )
+  rm -rf "$repo_dir"
+}
+
+test_open_text_success_contract_round_trips() {
+  local repo_dir
+  repo_dir="$(mktemp -d)"
+  (
+    cd "$repo_dir"
+    scope='Ship "forgot password" / email fallback'
+    done_when='users can finish "forgot password" & email fallback end-to-end'
+
+    output_init="$("$INIT_PATH" "$scope" --done-when "$done_when")"
+    session_id="$(printf '%s\n' "$output_init" | awk '/Initialized Forge Codex driver session/ {print $6}' | tr -d '.')"
+    forge_state_path=".codex/forge/forge-state.${session_id}.md"
+
+    assert_contains "$(cat "$forge_state_path")" 'scope: "Ship \"forgot password\" / email fallback"' "forge-init should YAML-escape open text scope"
+    assert_contains "$(cat "$forge_state_path")" 'done_when: "users can finish \"forgot password\" & email fallback end-to-end"' "forge-init should YAML-escape explicit done_when"
+
+    output_continue="$("$CONTINUE_PATH" "$session_id")"
+    assert_contains "$output_continue" "SCOPE: ${scope}" "forge-continue should render unescaped scope text"
+    assert_contains "$output_continue" "DONE WHEN: ${done_when}" "forge-continue should render unescaped done_when text"
+
+    output_status="$("$STATUS_PATH" "$session_id")"
+    assert_contains "$output_status" "Scope: ${scope}" "forge-status should render unescaped scope text"
+    assert_contains "$output_status" "Done when: ${done_when}" "forge-status should render unescaped done_when text"
   )
   rm -rf "$repo_dir"
 }
@@ -132,6 +160,7 @@ test_status_and_error_paths() {
     output_status="$("$STATUS_PATH" "$session_id")"
     assert_contains "$output_status" "Session: ${session_id}" "forge-status should report the session"
     assert_contains "$output_status" "Next iteration: 1" "forge-status should report the next required iteration"
+    assert_contains "$output_status" "Success mode: task-derived" "forge-status should report task-derived success mode when no override is provided"
 
     sed -i.bak 's/^max_iterations: .*/max_iterations: nope/' ".codex/forge/loop-state.${session_id}.md"
     rm -f ".codex/forge/loop-state.${session_id}.md.bak"
@@ -158,6 +187,7 @@ EOF
 
 main() {
   test_codex_init_continue_cancel
+  test_open_text_success_contract_round_trips
   test_codex_install
   test_multiple_active_sessions_require_explicit_id
   test_status_and_error_paths

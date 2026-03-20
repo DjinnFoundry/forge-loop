@@ -29,11 +29,12 @@ if [[ ! -f "$loop_state" ]] || [[ ! -f "$forge_state" ]]; then
   exit 1
 fi
 
-active="$(forge_frontmatter_value "$loop_state" "active")"
-max_iterations="$(forge_frontmatter_value "$loop_state" "max_iterations")"
-scope="$(forge_frontmatter_value "$forge_state" "scope")"
+active="$(forge_strip_quotes "$(forge_frontmatter_value "$loop_state" "active")")"
+max_iterations="$(forge_strip_quotes "$(forge_frontmatter_value "$loop_state" "max_iterations")")"
+scope="$(forge_strip_quotes "$(forge_frontmatter_value "$forge_state" "scope")")"
 recorded_iteration="$(forge_recorded_iteration "$forge_state")"
 iteration=$((recorded_iteration + 1))
+done_when_text="$(forge_done_when_text "$forge_state")"
 
 if [[ "$active" != "true" ]]; then
   echo "Error: Session ${session_id} is not active." >&2
@@ -50,7 +51,7 @@ if (( iteration > max_iterations )); then
   exit 1
 fi
 
-prompt_text="$(forge_render_prompt "$PROMPT_TEMPLATE" "$session_id" "$scope" "$iteration")"
+prompt_text="$(forge_render_prompt "$PROMPT_TEMPLATE" "$session_id" "$scope" "$iteration" "$done_when_text")"
 
 echo "Forge Codex driver session ${session_id}, iteration ${iteration}."
 echo "Forge state: .codex/forge/forge-state.${session_id}.md"

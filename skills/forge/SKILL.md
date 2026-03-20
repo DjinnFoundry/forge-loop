@@ -1,11 +1,11 @@
 ---
 name: forge
-description: Forge Core protocol plus Claude Code and Codex/manual drivers for KPI-driven autoregressive codebase improvement. Tracks coverage/speed/quality with baselines, rotates strategies on stagnation, and uses fresh-context evaluation. Activates when user mentions "forge it", "forge loop", "quality loop", "kpi loop", "improvement loop".
+description: Forge Core protocol plus Claude Code and Codex/manual drivers for task-driven looping with KPI guardrails. Tracks coverage/speed/quality with baselines, rotates strategies on stagnation, derives or records success criteria for the task itself, and uses fresh-context evaluation. Activates when user mentions "forge it", "forge loop", "quality loop", "kpi loop", "improvement loop".
 ---
 
 # The Forge — Core Protocol Plus Claude Code and Codex Drivers
 
-A structured, KPI-driven improvement protocol that tracks coverage/speed/quality with baselines and targets, evaluates with fresh-context audits, rotates strategies when stagnating, and records lessons across iterations.
+A structured, task-driven improvement protocol with KPI guardrails. Forge tracks coverage/speed/quality with baselines and targets, derives or records success criteria for the task itself, evaluates with fresh-context audits, rotates strategies when stagnating, and records lessons across iterations.
 
 Built on the Ralph Wiggum loop pattern (Geoff Huntley), informed by Karpathy's autoregressive philosophy and SICA's compounding iteration approach.
 
@@ -46,9 +46,10 @@ Each iteration (one OODA cycle):
 Forge has two layers:
 
 - **Forge Core** — portable protocol, state model, KPI semantics, strategies, and completion rules
+- **Success contract** — task objective plus explicit or derived completion checks
 - **Driver** — runtime-specific integration that launches the loop, persists state, and handles pause/continue mechanics
 
-`v0.4.2` ships two first-class drivers:
+`v0.5.0` ships two first-class drivers:
 
 - **Claude Code** — command, agent, and stop-hook integration are bundled here
 - **Codex** — `forge-init`, `forge-continue`, `forge-cancel`, and `forge-status` manage a manual loop with project-local state
@@ -66,6 +67,11 @@ Read the Forge state file for this session. Driver defaults:
 - Codex: `.codex/forge/forge-state.SESSION.md`
 
 - Parse baseline KPIs, targets, iteration history, current strategy
+- Parse the success contract:
+  - `task`: the primary requested work
+  - `done_when`: explicit success override, if provided
+  - `completion_checks`: concrete checks derived from task + override
+- If `completion_checks` is empty, derive them before EXECUTE and persist them in forge-state
 - Check `stagnation_count` — if >= 3, MUST rotate strategy
 - Review lessons from previous iterations (avoid repeating failures)
 - First iteration: no state yet, proceed to MEASURE
@@ -99,6 +105,22 @@ Spawn a fresh-context audit using an agent or persona available in your environm
 
 Main agent reviews findings critically against its KPI targets.
 Record findings count by severity in forge-state.
+
+### Success model
+
+Forge has two goal layers:
+
+- **Task success** — what the requested work must make true
+- **KPI guardrails** — tests, coverage, speed, quality, and no critical regressions
+
+If the user gives only open text scope, derive concrete `completion_checks` from
+that task and record them in forge-state.
+
+If the user provides `--done-when`, treat that as the explicit override and
+derive any additional clarifying `completion_checks` from it.
+
+Do not mark Forge complete just because the KPIs improved. The task itself must
+be honestly done.
 
 ### D. DECIDE — Pick Strategy
 
@@ -179,6 +201,7 @@ Update the Forge state file for the current driver. Driver defaults:
    - KPIs before and after (with deltas)
    - Strategy used
    - Actions taken (brief)
+   - Success contract progress or refinement if it changed
    - Findings count (if evaluation ran)
    - Lesson learned
 
@@ -206,6 +229,7 @@ Update the Forge state file for the current driver. Driver defaults:
 ### H. COMPLETE — All Targets Met?
 
 Check ALL conditions simultaneously:
+- the recorded task success contract is satisfied
 - coverage >= min_coverage target
 - speed_seconds <= max_speed_seconds target
 - failures == 0
@@ -247,6 +271,13 @@ Driver defaults:
 ---
 session_id: "MMDD-HHMM-XXXX"
 scope: "description of scope"
+success:
+  mode: "task-derived"
+  task: "build password reset flow"
+  done_when: null
+  completion_checks:
+    - "users can request a reset and use the token successfully"
+    - "failure paths are covered and tested"
 baseline:
   coverage: 92.99
   speed_seconds: 81
@@ -301,6 +332,7 @@ ideas:
 8. **Simpler is better** — code deletion at same KPIs is always a win. Don't add complexity for marginal gains.
 9. **Clean revert on failure** — restore clean state before the next iteration. Never leave dirty files.
 10. **Never stop to ask** — if stuck, think harder. Re-read code, review backlog, combine near-misses, try the inverse.
+11. **Task success comes first** — KPIs are guardrails, not a substitute for actually finishing the requested work.
 
 ## Support posture
 

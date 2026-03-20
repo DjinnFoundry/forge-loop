@@ -62,12 +62,26 @@ forge_render_prompt() {
   local session_id="$2"
   local scope="$3"
   local iteration="$4"
+  local done_when="$5"
 
   sed \
     -e "s/{SESSION}/${session_id}/g" \
-    -e "s/{SCOPE}/${scope//\//\\/}/g" \
+    -e "s/{SCOPE}/$(forge_sed_escape "$scope")/g" \
     -e "s/{ITERATION}/${iteration}/g" \
+    -e "s/{DONE_WHEN}/$(forge_sed_escape "$done_when")/g" \
     "$template"
+}
+
+forge_done_when_text() {
+  local forge_state="$1"
+  local raw_done_when
+
+  raw_done_when="$(forge_strip_quotes "$(forge_nested_frontmatter_value "$forge_state" "success" "done_when")")"
+  if [[ -n "$raw_done_when" ]] && [[ "$raw_done_when" != "null" ]]; then
+    printf '%s\n' "$raw_done_when"
+  else
+    printf '%s\n' "Derive concrete completion checks from the task scope and record them in forge-state before EXECUTE."
+  fi
 }
 
 forge_codex_status() {
@@ -85,18 +99,22 @@ forge_codex_status() {
     return 1
   fi
 
-  local active max_iterations scope last_prompted_iteration recorded_iteration next_iteration
+  local active max_iterations scope success_mode last_prompted_iteration recorded_iteration next_iteration done_when_text
   active="$(forge_strip_quotes "$(forge_frontmatter_value "$loop_state" "active")")"
   max_iterations="$(forge_strip_quotes "$(forge_frontmatter_value "$loop_state" "max_iterations")")"
   scope="$(forge_strip_quotes "$(forge_frontmatter_value "$forge_state" "scope")")"
+  success_mode="$(forge_strip_quotes "$(forge_nested_frontmatter_value "$forge_state" "success" "mode")")"
   last_prompted_iteration="$(forge_strip_quotes "$(forge_frontmatter_value "$loop_state" "last_prompted_iteration")")"
   recorded_iteration="$(forge_recorded_iteration "$forge_state")"
   next_iteration=$((recorded_iteration + 1))
+  done_when_text="$(forge_done_when_text "$forge_state")"
 
   printf 'Session: %s\n' "$session_id"
   printf 'Driver: Codex\n'
   printf 'Active: %s\n' "$active"
   printf 'Scope: %s\n' "$scope"
+  printf 'Success mode: %s\n' "${success_mode:-task-derived}"
+  printf 'Done when: %s\n' "$done_when_text"
   printf 'Recorded iterations: %s\n' "$recorded_iteration"
   printf 'Last prompted iteration: %s\n' "${last_prompted_iteration:-0}"
   printf 'Next iteration: %s\n' "$next_iteration"

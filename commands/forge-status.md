@@ -22,6 +22,9 @@ Show the current Claude Code driver status for this project.
    - forge-state path if present
 5. If the forge-state file exists, also show:
    - scope
+   - success mode
+   - done_when text, or that it is task-derived if no explicit override exists
    - current strategy
    - stagnation_count
+   - whether completion checks have been recorded yet if the success block is present
 6. Do not mutate any files. This command is read-only.

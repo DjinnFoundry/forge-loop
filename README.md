@@ -21,17 +21,18 @@
 **Forge Core with first-class drivers for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex/manual workflows.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.4.2-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.0-green.svg)](CHANGELOG.md)
 
-Forge is a protocol plus an adapter. The protocol defines KPI tracking, state, strategy rotation, evaluation cadence, and completion rules. The bundled adapter makes that protocol run inside Claude Code with commands, agents, and a stop hook.
+Forge is a protocol plus adapters. The protocol defines task success, KPI guardrails, state, strategy rotation, evaluation cadence, and completion rules. The bundled drivers make that protocol run inside Claude Code and Codex/manual workflows.
 
 ```
-You: /forge "API controllers" --coverage 90 --speed -30%
+You: /forge "password reset flow" --done-when "users can request and complete a reset end-to-end" --coverage 90 --speed -30%
 
 Forge: Measuring baseline... 85.2% coverage, 120s
+       Success contract: password reset works end-to-end
        Strategy: coverage-push → 15 tests for edge cases
        85.8% (+0.6%), 118s (-2s) ✓
-       ...iterates until all targets met simultaneously...
+       ...iterates until task success and KPI targets are both satisfied...
 ```
 
 ---
@@ -43,6 +44,7 @@ Forge: Measuring baseline... 85.2% coverage, 120s
 The portable part of the system:
 
 - iteration protocol (Orient → Measure → Evaluate → Decide → Execute → Verify → Record → Complete)
+- task-driven success contract with optional explicit `done_when`
 - state format and autoregressive memory
 - KPI targets (coverage, speed, quality)
 - strategy selection and stagnation handling
@@ -71,7 +73,7 @@ The bundled Codex/manual adapter in this repo:
 - `.codex/forge/` state layout for per-project sessions
 - shared shell state helpers reused across drivers
 
-Both drivers are first-class in `v0.4.2`. The difference is automation depth:
+Both drivers are first-class in `v0.5.0`. The difference is automation depth:
 Claude gets hook-driven iteration; Codex gets manual driver scripts that print
 the next prompt and manage session state.
 
@@ -83,7 +85,7 @@ the next prompt and manage session state.
 | Codex CLI | First-class manual driver | Install script, `forge-init`, `forge-continue`, `forge-cancel`, project-local state |
 | Other agents / plain shell | Protocol-only | Reuse the protocol and state model manually |
 
-Forge is not claiming native parity across agent runtimes. `v0.4.2` ships two real drivers with different control surfaces.
+Forge is not claiming native parity across agent runtimes. `v0.5.0` ships two real drivers with different control surfaces.
 
 ---
 
@@ -105,14 +107,24 @@ Each iteration executes one complete eight-phase cycle:
 
 | Phase | What happens |
 |-------|-------------|
-| **A. Orient** | Read forge-state file, check position + trends + stagnation count |
+| **A. Orient** | Read forge-state file, check task success contract + KPI trends + stagnation count |
 | **B. Measure** | Run tests with coverage, capture KPIs |
 | **C. Evaluate** | Every 3rd iteration: spawn fresh-context subagent for unbiased audit |
 | **D. Decide** | Pick strategy from KPI gaps + findings + lessons |
 | **E. Execute** | Apply ONE focused transformation |
 | **F. Verify** | Tests must be green, re-measure KPIs |
 | **G. Record** | Update forge-state with deltas + lessons (the autoregressive step) |
-| **H. Complete** | All targets met simultaneously? Done. Otherwise, next iteration. |
+| **H. Complete** | Task success contract satisfied and KPI targets met? Done. Otherwise, next iteration. |
+
+### Success Contract
+
+Forge is built for open-text work, not just KPI chasing.
+
+- The task scope is the primary objective.
+- `--done-when "TEXT"` is an optional explicit success override.
+- If `--done-when` is omitted, Forge derives concrete completion checks from the task scope and records them in Forge state.
+- Coverage, speed, and quality stay as guardrails alongside the task itself.
+- Completion means both the task and the guardrails are satisfied.
 
 ### Strategies
 
@@ -183,7 +195,7 @@ Codex support is manual by design, but it is now a real shipped driver.
 
 Typical flow:
 
-1. Run `forge-init "scope" ...` in the target project.
+1. Run `forge-init "scope" [--done-when "TEXT"] ...` in the target project.
 2. Paste the printed prompt into Codex.
 3. After each iteration, run `forge-continue` to print the next prompt.
 4. Use `forge-status` to inspect the active session.
@@ -209,15 +221,22 @@ Driver safety:
 /forge "LiveView components" --coverage 95 --speed -20%
 ```
 
+#### Open-text task with explicit success
+
+```
+/forge "password reset flow" --done-when "users can request, receive, and complete a reset end-to-end" --coverage 90 --quality strict
+```
+
 #### All options
 
 ```
-/forge "SCOPE" --coverage N --speed -N% --quality strict|moderate|lax --max-iterations N
+/forge "SCOPE" [--done-when "TEXT"] --coverage N --speed -N% --quality strict|moderate|lax --max-iterations N
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `SCOPE` | (required) | What to improve — quoted string |
+| `--done-when "TEXT"` | task-derived | Explicit success contract. If omitted, derive completion checks from the task itself |
 | `--coverage N` | baseline + 2 | Minimum coverage % target |
 | `--speed -N%` | -20% | Speed reduction from baseline |
 | `--quality` | moderate | strict (0 high, 0 med) / moderate (0 high, ≤3 med) / lax (0 high, ≤5 med) |
@@ -253,6 +272,13 @@ Other runtimes can reuse the same format in a different state root. Each iterati
 ---
 session_id: "0320-1430-a3b2"
 scope: "API controllers"
+success:
+  mode: "task-derived"
+  task: "API controllers"
+  done_when: null
+  completion_checks:
+    - "controller edge cases covered and passing"
+    - "no controller path regresses current behavior"
 baseline:
   coverage: 85.2
   speed_seconds: 120
@@ -347,7 +373,7 @@ Distilled from studying autoresearch, Ralph Wiggum, pi-autoresearch, SICA, and a
 | Strategy | Single prompt | 8 named strategies, auto-rotation on stagnation |
 | Evaluation | Self-evaluation (anchoring bias) | Fresh-context audits every 3 iterations |
 | Memory | Context window only | Persistent state file survives compaction |
-| Completion | Manual / hope | Exact completion marker after protocol checks |
+| Completion | Manual / hope | Exact completion marker after task success plus protocol checks |
 | Lessons | Lost between iterations | Accumulated, inform strategy selection |
 | Stagnation | Repeats same approach | Detects + rotates after low-delta iterations |
 | Portability | Rebuild per runtime | Portable protocol, Claude and Codex drivers bundled |
@@ -357,7 +383,7 @@ Distilled from studying autoresearch, Ralph Wiggum, pi-autoresearch, SICA, and a
 ## Claims We Are Willing To Make
 
 - Forge packages proven loop patterns into a reusable protocol with first-class Claude Code and Codex/manual drivers.
-- Forge improves repeatability versus ad-hoc prompting when you care about KPI targets, iteration memory, and strategy rotation.
+- Forge improves repeatability versus ad-hoc prompting when you care about task success, KPI guardrails, iteration memory, and strategy rotation.
 - Forge does **not** yet provide universal runtime adapter parity beyond the shipped drivers.
 - Forge is more preconfigured than raw hooks. It is not a new primitive.
 

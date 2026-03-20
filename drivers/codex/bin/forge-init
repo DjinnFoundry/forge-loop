@@ -10,7 +10,7 @@ source "$LIB_PATH"
 
 usage() {
   cat <<'EOF'
-Usage: forge-init "SCOPE" [--coverage N] [--speed -N%] [--quality strict|moderate|lax] [--max-iterations N]
+Usage: forge-init "SCOPE" [--done-when "TEXT"] [--coverage N] [--speed -N%] [--quality strict|moderate|lax] [--max-iterations N]
 EOF
 }
 
@@ -34,6 +34,7 @@ coverage_target=""
 speed_target="-20%"
 quality_target="moderate"
 max_iterations="20"
+done_when=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -50,6 +51,11 @@ while [[ $# -gt 0 ]]; do
     --quality)
       require_value "$1" "${2:-}"
       quality_target="$2"
+      shift 2
+      ;;
+    --done-when)
+      require_value "$1" "${2:-}"
+      done_when="$2"
       shift 2
       ;;
     --max-iterations)
@@ -96,6 +102,12 @@ timestamp="$(date -u +"%m%d-%H%M")"
 rand="$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n' | cut -c1-4)"
 session_id="${timestamp}-${rand}"
 started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+success_mode="$(if [[ -n "$done_when" ]]; then printf 'explicit'; else printf 'task-derived'; fi)"
+done_when_yaml="null"
+if [[ -n "$done_when" ]]; then
+  done_when_yaml="$(forge_yaml_quote "$done_when")"
+fi
+scope_yaml="$(forge_yaml_quote "$scope")"
 
 forge_state="${state_dir}/forge-state.${session_id}.md"
 loop_state="${state_dir}/loop-state.${session_id}.md"
@@ -103,9 +115,14 @@ loop_state="${state_dir}/loop-state.${session_id}.md"
 cat > "$forge_state" <<EOF
 ---
 session_id: "${session_id}"
-scope: "${scope}"
+scope: ${scope_yaml}
 driver: "codex"
 state_root: ".codex/forge"
+success:
+  mode: "${success_mode}"
+  task: ${scope_yaml}
+  done_when: ${done_when_yaml}
+  completion_checks: []
 baseline:
   coverage: null
   speed_seconds: null
@@ -127,6 +144,7 @@ ideas: []
 ## Session
 - Driver: Codex
 - Scope: ${scope}
+- Done when: ${done_when:-Derive concrete completion checks from the task scope and record them during iteration 1.}
 - Started at: ${started_at}
 - Notes: Baseline not measured yet. First iteration must establish it from real test output.
 EOF
@@ -144,7 +162,8 @@ started_at: "${started_at}"
 ---
 EOF
 
-prompt_text="$(forge_render_prompt "$PROMPT_TEMPLATE" "$session_id" "$scope" "1")"
+done_when_text="${done_when:-Derive concrete completion checks from the task scope and record them in forge-state before EXECUTE.}"
+prompt_text="$(forge_render_prompt "$PROMPT_TEMPLATE" "$session_id" "$scope" "1" "$done_when_text")"
 
 echo "Initialized Forge Codex driver session ${session_id}."
 echo "Forge state: .codex/forge/forge-state.${session_id}.md"
