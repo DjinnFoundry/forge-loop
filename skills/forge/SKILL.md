@@ -1,0 +1,233 @@
+---
+name: forge
+description: KPI-driven autoregressive codebase improvement loop. Tracks coverage/speed/quality with baselines, rotates strategies on stagnation, uses fresh-context subagents for unbiased evaluation. Activates when user mentions "forge it", "forge loop", "quality loop", "kpi loop", "improvement loop".
+---
+
+# The Forge — Autoregressive Codebase Improvement Loop
+
+A structured, KPI-driven, self-correcting loop that tracks coverage/speed/quality with baselines and targets, evaluates with fresh-context subagents (no anchoring bias), rotates strategies when stagnating, and knows when it's done.
+
+Built on the Ralph Wiggum loop pattern (Geoff Huntley), informed by Karpathy's autoregressive philosophy and SICA's compounding iteration approach.
+
+## Activation Triggers
+- "forge it", "forge this", "forge loop"
+- "quality loop", "kpi loop", "improvement loop"
+- "codebase improvement loop"
+- When user wants structured, KPI-driven autonomous improvement
+
+## Architecture
+
+```
+/forge command
+  ├── Creates .claude/forge-state.SESSION.md  (KPI state, autoregressive log)
+  ├── Creates .claude/ralph-loop.SESSION.local.md  (iteration engine)
+  └── Stop hook drives the loop (re-injects prompt on session exit)
+
+Each iteration (one OODA cycle):
+  ├── A. ORIENT   — Read forge-state, understand position + trends
+  ├── B. MEASURE  — Run tests, capture KPIs
+  ├── C. EVALUATE — Every 3rd iteration: fresh-context reality-check subagent
+  ├── D. DECIDE   — Pick strategy + target from KPI gaps + findings
+  ├── E. EXECUTE  — Apply ONE focused transformation
+  ├── F. VERIFY   — Run tests, re-measure KPIs
+  ├── G. RECORD   — Update forge-state with deltas + lessons
+  └── H. COMPLETE — All targets met simultaneously? → RALPH_COMPLETE
+```
+
+## The Forge Protocol
+
+### A. ORIENT — Read State
+
+Read `.claude/forge-state.SESSION.md` (SESSION from ralph state file).
+
+- Parse baseline KPIs, targets, iteration history, current strategy
+- Check `stagnation_count` — if >= 3, MUST rotate strategy
+- Review lessons from previous iterations (avoid repeating failures)
+- First iteration: no state yet, proceed to MEASURE
+
+### B. MEASURE — Capture Current KPIs
+
+Run your test suite with coverage enabled and parse output for:
+- **coverage**: percentage from cover summary
+- **speed_seconds**: total test time
+- **tests**: total test count
+- **failures**: failure count
+- **warnings**: compiler warning count (optional, first run)
+
+**Elixir**: `mix test --cover 2>&1`
+**Python**: `pytest --cov --cov-report=term 2>&1`
+**JavaScript**: `npm test -- --coverage 2>&1`
+**Ruby**: `bundle exec rspec 2>&1` (with SimpleCov)
+**Go**: `go test -cover ./... 2>&1`
+
+First iteration: record as **baseline** in forge-state.
+Subsequent: compute deltas from previous iteration AND from baseline.
+
+### C. EVALUATE — Fresh-Context Reality Check
+
+**When**: iteration 1 AND every 3rd iteration thereafter (1, 4, 7, 10...).
+
+Spawn a subagent (pentest-analyst, architecture-reviewer, or code-refactorer depending on scope) with:
+- ONLY the scope files/modules
+- Prompt: "Audit [scope]. Report findings by severity (high/medium/low). No context about KPI targets or iteration state."
+- NO forge state, NO iteration context, NO KPI targets — unbiased evaluation
+
+Main agent reviews findings critically against its KPI targets.
+Record findings count by severity in forge-state.
+
+### D. DECIDE — Pick Strategy
+
+#### Available Strategies
+
+| Strategy | When to use | Typical impact |
+|----------|-------------|----------------|
+| `component-extraction` | DRY violations, repeated patterns | Coverage + quality |
+| `refactor-for-testability` | Code hard to test (private, coupled) | Coverage |
+| `coverage-push` | Clear coverage gaps, uncovered modules | Coverage |
+| `speed-optimization` | async:false overuse, slow fixtures, redundant DB | Speed |
+| `dead-code-removal` | Unused code flagged by reality-check | Quality + coverage |
+| `quality-polish` | Naming, complexity, clarity issues | Quality |
+| `design-system` | Duplicated UI patterns, status badges | Quality + coverage |
+
+#### Selection Logic
+
+1. Compute **normalized KPI gap** for each target:
+   - coverage_gap = (target - current) / target
+   - speed_gap = (current - target) / current  (inverted — lower is better)
+   - quality_gap = high_findings / 5  (scale 0..1)
+
+2. **Largest gap** gets priority in strategy selection:
+   - coverage_gap largest → `coverage-push` or `refactor-for-testability`
+   - speed_gap largest → `speed-optimization`
+   - quality_gap largest → `component-extraction` or `dead-code-removal`
+
+3. **High findings from reality-check** → immediate `component-extraction` or `refactor-for-testability`
+
+4. **Stagnation** (stagnation_count >= 3):
+   - Pick best historical delta strategy OR untried strategy
+   - Log: "Strategy '{current}' stagnating, switching to '{new}'"
+   - Reset stagnation_count
+
+5. **Never repeat a strategy that yielded negative deltas** without changing approach
+
+### E. EXECUTE — ONE Focused Change
+
+Each iteration does ONE thing well:
+
+- **Structural refactoring** → spawn `code-refactorer` agent (small steps, tests between)
+- **Clarity/polish** → spawn `code-simplifier` agent (post-refactor)
+- **Coverage gaps** → write tests + refactor for testability
+- **Speed optimization** → convert sync to async tests, consolidate fixtures, reduce DB hits
+- **Dead code removal** → delete unused code flagged by evaluation
+- **Design system** → extract shared components (badges, cards, indicators)
+
+Use subagents for heavy lifting to preserve main context window.
+
+### F. VERIFY — Tests Must Be Green
+
+Run tests — **must be green** before proceeding.
+If red: debug and fix within this iteration. Do NOT proceed to RECORD with failures.
+Re-measure with coverage to capture post-change KPIs.
+
+### G. RECORD — Update Forge State (THE Autoregressive Step)
+
+Update `.claude/forge-state.SESSION.md`:
+
+1. **Append iteration entry** with:
+   - Iteration number
+   - KPIs before and after (with deltas)
+   - Strategy used
+   - Actions taken (brief)
+   - Findings count (if evaluation ran)
+   - Lesson learned
+
+2. **Update strategy tracking**:
+   - Add iteration to current strategy's history
+   - Record coverage_delta and speed_delta for the strategy
+
+3. **Stagnation detection**:
+   - Coverage delta < 0.1% for 2 consecutive iterations → increment stagnation_count
+   - Any improvement > 0.1% → reset stagnation_count to 0
+
+4. **Git commit** if tests green AND any improvement:
+   - Stage changed files (NOT forge-state, it's in .claude/)
+   - Commit with: `forge(N): [strategy] — [brief description]`
+
+### H. COMPLETE — All Targets Met?
+
+Check ALL conditions simultaneously:
+- coverage >= min_coverage target
+- speed_seconds <= max_speed_seconds target
+- failures == 0
+- high_findings == 0 (from last evaluation)
+
+If ALL met → output `RALPH_COMPLETE`
+If not → exit normally (stop hook re-injects prompt for next iteration)
+
+## Stagnation Protocol
+
+```
+if stagnation_count >= 3:
+  1. Log: "Strategy '{current}' stagnating after {N} low-delta iterations"
+  2. Rank strategies by historical effectiveness (coverage_delta / iterations)
+  3. Pick: best historical strategy OR untried strategy
+  4. Reset stagnation_count to 0
+  5. Record lesson: "'{old}' exhausted after iterations [X,Y,Z], switching to '{new}'"
+```
+
+## Forge State File Format
+
+`.claude/forge-state.SESSION.md`:
+
+```yaml
+---
+session_id: "MMDD-HHMM-XXXX"
+scope: "description of scope"
+baseline:
+  coverage: 92.99
+  speed_seconds: 81
+  tests: 21563
+  failures: 0
+  measured_at: "2026-03-20T14:30:00Z"
+targets:
+  min_coverage: 95.0
+  max_speed_seconds: 40
+  quality: "moderate"
+  max_iterations: 20
+current_strategy: "coverage-push"
+stagnation_count: 0
+strategies_tried:
+  - name: "coverage-push"
+    iterations: [1, 2]
+    coverage_delta: 0.8
+    speed_delta: -5
+lessons:
+  - "async:true on LiveView tests saves ~3s per file"
+---
+
+## Iteration 1 — coverage-push
+- Coverage: 92.99 -> 93.15 (+0.16%)
+- Speed: 81s -> 79s (-2s)
+- Tests: 21563 -> 21578 (+15)
+- Actions: Added 15 tests for data_loaders.ex edge cases
+- Reality-check: 2 high, 3 medium findings
+- Lesson: "data_loaders has 7 identical try-rescue - extract, don't test each"
+```
+
+## Quality Levels
+
+| Level | High findings | Medium findings |
+|-------|---------------|-----------------|
+| `strict` | 0 | 0 |
+| `moderate` | 0 | <= 3 |
+| `lax` | 0 | <= 5 |
+
+## Critical Rules
+
+1. **ONE change per iteration** — resist the urge to batch. Small steps compound.
+2. **Never skip VERIFY** — red tests mean the iteration failed. Fix before RECORD.
+3. **Never fabricate KPIs** — always parse from actual test runner output.
+4. **Subagents for evaluation** — fresh context prevents anchoring bias.
+5. **Lessons accumulate** — read ALL previous lessons before DECIDE. Never repeat a documented failure.
+6. **Commit on green** — every improvement gets persisted to git.
+7. **State file is sacred** — it survives context compaction. Keep it accurate.
