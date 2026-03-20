@@ -21,7 +21,7 @@
 **Forge Core with first-class drivers for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex/manual workflows.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.1-green.svg)](CHANGELOG.md)
 
 Forge is a protocol plus adapters. The protocol defines task success, KPI guardrails, state, strategy rotation, evaluation cadence, and completion rules. The bundled drivers make that protocol run inside Claude Code and Codex/manual workflows.
 
@@ -73,7 +73,7 @@ The bundled Codex/manual adapter in this repo:
 - `.codex/forge/` state layout for per-project sessions
 - shared shell state helpers reused across drivers
 
-Both drivers are first-class in `v0.5.0`. The difference is automation depth:
+Both drivers are first-class in `v0.5.1`. The difference is automation depth:
 Claude gets hook-driven iteration; Codex gets manual driver scripts that print
 the next prompt and manage session state.
 
@@ -85,7 +85,7 @@ the next prompt and manage session state.
 | Codex CLI | First-class manual driver | Install script, `forge-init`, `forge-continue`, `forge-cancel`, project-local state |
 | Other agents / plain shell | Protocol-only | Reuse the protocol and state model manually |
 
-Forge is not claiming native parity across agent runtimes. `v0.5.0` ships two real drivers with different control surfaces.
+Forge is not claiming native parity across agent runtimes. `v0.5.1` ships two real drivers with different control surfaces.
 
 ---
 

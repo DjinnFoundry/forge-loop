@@ -7,7 +7,18 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE_PATH" ]]; do
+  LINK_DIR="$(cd "$(dirname "$SOURCE_PATH")" && pwd)"
+  TARGET_PATH="$(readlink "$SOURCE_PATH")"
+  if [[ "$TARGET_PATH" == /* ]]; then
+    SOURCE_PATH="$TARGET_PATH"
+  else
+    SOURCE_PATH="${LINK_DIR}/${TARGET_PATH}"
+  fi
+done
+
+SCRIPT_DIR="$(cd "$(dirname "$SOURCE_PATH")" && pwd)"
 source "${SCRIPT_DIR}/../scripts/forge-state-lib.sh"
 
 # Read hook input from stdin

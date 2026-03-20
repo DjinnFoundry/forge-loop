@@ -84,6 +84,21 @@ run_hook() {
     | (cd "${repo_dir}" && bash "${HOOK_PATH}")
 }
 
+run_hook_via_symlink() {
+  local repo_dir="$1"
+  local install_dir
+  install_dir="$(mktemp -d)"
+  mkdir -p "${install_dir}/hooks"
+  ln -s "${HOOK_PATH}" "${install_dir}/hooks/stop-hook.sh"
+
+  local output
+  output="$(printf '{"transcript_path":"%s"}\n' "${repo_dir}/transcript.jsonl" \
+    | (cd "${repo_dir}" && bash "${install_dir}/hooks/stop-hook.sh"))"
+
+  rm -rf "${install_dir}"
+  printf '%s' "$output"
+}
+
 with_repo() {
   local test_name="$1"
   local repo_dir
@@ -202,6 +217,18 @@ test_exact_promise_marker_finishes() {
   fi
 }
 
+test_symlinked_hook_resolves_helper_library() {
+  local repo_dir="$1"
+  write_state "${repo_dir}" "true" "1" "null"
+  write_transcript "${repo_dir}" "regular output"
+
+  local output
+  output="$(run_hook_via_symlink "${repo_dir}")"
+
+  assert_contains "$output" '"decision": "block"' "symlinked hook should still continue the loop"
+  assert_equals "2" "$(state_field "${repo_dir}" "iteration")" "symlinked hook should increment iteration"
+}
+
 main() {
   with_repo test_regular_output_continues
   with_repo test_embedded_complete_marker_does_not_finish
@@ -211,6 +238,7 @@ main() {
   with_repo test_paused_loops_stay_paused
   with_repo test_embedded_promise_marker_does_not_finish
   with_repo test_exact_promise_marker_finishes
+  with_repo test_symlinked_hook_resolves_helper_library
 
   echo "stop-hook tests passed"
 }
