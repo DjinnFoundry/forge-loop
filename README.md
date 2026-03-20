@@ -73,7 +73,7 @@ The bundled Codex/manual adapter in this repo:
 - `.codex/forge/` state layout for per-project sessions
 - shared shell state helpers reused across drivers
 
-Both drivers are first-class in `v0.5.1`. The difference is automation depth:
+Both drivers are first-class. The difference is automation depth:
 Claude gets hook-driven iteration; Codex gets manual driver scripts that print
 the next prompt and manage session state.
 
@@ -85,7 +85,7 @@ the next prompt and manage session state.
 | Codex CLI | First-class manual driver | Install script, `forge-init`, `forge-continue`, `forge-cancel`, project-local state |
 | Other agents / plain shell | Protocol-only | Reuse the protocol and state model manually |
 
-Forge is not claiming native parity across agent runtimes. `v0.5.1` ships two real drivers with different control surfaces.
+Forge is not claiming native parity across agent runtimes. It ships two real drivers with different control surfaces.
 
 ---
 

@@ -49,7 +49,7 @@ Forge has two layers:
 - **Success contract** — task objective plus explicit or derived completion checks
 - **Driver** — runtime-specific integration that launches the loop, persists state, and handles pause/continue mechanics
 
-`v0.5.1` ships two first-class drivers:
+Forge currently ships two first-class drivers:
 
 - **Claude Code** — command, agent, and stop-hook integration are bundled here
 - **Codex** — `forge-init`, `forge-continue`, `forge-cancel`, and `forge-status` manage a manual loop with project-local state
