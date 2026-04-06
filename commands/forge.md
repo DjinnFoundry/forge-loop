@@ -39,14 +39,14 @@ If SCOPE is missing, ask what area to focus on.
    - coverage: `--coverage N` if provided, else `baseline_coverage + 2`
    - speed: `--speed -N%` if provided, compute `baseline_speed * (1 - N/100)`, else `baseline_speed * 0.8`
    - quality: `--quality` value or "moderate"
-5. **Create forge state file**: `.claude/forge-state.SESSION.md` with success contract + baseline + targets
-6. **Create loop state file**: `.claude/forge-loop.SESSION.local.md` with forge prompt
+5. **Create forge state file**: `.claude/forge-state.{session_id}.md` with success contract + baseline + targets
+6. **Create loop state file**: `.claude/forge-loop.{session_id}.local.md` with forge prompt
 7. **Report** baseline, targets, and begin first iteration
 
 ## Loop Prompt (written to state file)
 
 ```
-Read .claude/forge-state.SESSION.md and follow The Forge Protocol (A through H).
+Read .claude/forge-state.{session_id}.md and follow The Forge Protocol (A through H).
 
 SCOPE: {parsed scope}
 SESSION: {session_id}

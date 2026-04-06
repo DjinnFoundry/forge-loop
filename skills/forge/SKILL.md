@@ -62,10 +62,16 @@ officially supported unless they ship a real driver.
 
 ### A. ORIENT — Read State
 
-Read the Forge state file for this session. Driver defaults:
+**Session ID**: Each forge loop gets a unique session ID: `MMDD-HHMM-SLUG` where MMDD-HHMM is the current timestamp and SLUG is 2-3 words from the task (e.g., `0406-1530-djinnchat-primefix`). Generate this on the first iteration and reuse it every subsequent iteration.
 
-- Claude Code: `.claude/forge-state.SESSION.md`
-- Codex: `.codex/forge/forge-state.SESSION.md`
+State file path (substitute your session ID for `{sid}`):
+
+- Claude Code: `.claude/forge-state.{sid}.md`
+- Codex: `.codex/forge/forge-state.{sid}.md`
+
+**On first iteration**: no state file exists yet. Generate the session ID, proceed to MEASURE, and create the state file during RECORD.
+
+**On subsequent iterations**: read the state file matching your session ID. Never read or write a different session's state file — concurrent forge loops in the same repo are supported and must remain isolated.
 
 - Parse baseline KPIs, targets, iteration history, current strategy
 - Parse the success contract:
@@ -75,7 +81,6 @@ Read the Forge state file for this session. Driver defaults:
 - If `completion_checks` is empty, derive them before EXECUTE and persist them in forge-state
 - Check `stagnation_count` — if >= 3, MUST rotate strategy
 - Review lessons from previous iterations (avoid repeating failures)
-- First iteration: no state yet, proceed to MEASURE
 
 ### B. MEASURE — Capture Current KPIs
 
@@ -192,10 +197,10 @@ Re-measure with coverage to capture post-change KPIs.
 
 ### G. RECORD — Update Forge State (THE Autoregressive Step)
 
-Update the Forge state file for the current driver. Driver defaults:
+Update the Forge state file for the current driver (using your session ID `{sid}`):
 
-- Claude Code: `.claude/forge-state.SESSION.md`
-- Codex: `.codex/forge/forge-state.SESSION.md`
+- Claude Code: `.claude/forge-state.{sid}.md`
+- Codex: `.codex/forge/forge-state.{sid}.md`
 
 1. **Append iteration entry** with:
    - Iteration number
@@ -263,14 +268,14 @@ When stagnation triggers (or when you run out of ideas within a strategy):
 
 ## Forge State File Format
 
-Driver defaults:
+Driver defaults (substitute your generated session ID for `{sid}`):
 
-- Claude Code: `.claude/forge-state.SESSION.md`
-- Codex: `.codex/forge/forge-state.SESSION.md`
+- Claude Code: `.claude/forge-state.{sid}.md`
+- Codex: `.codex/forge/forge-state.{sid}.md`
 
 ```yaml
 ---
-session_id: "MMDD-HHMM-XXXX"
+session_id: "0406-1530-djinnchat-primefix"  # MMDD-HHMM-SLUG, generated once on first iteration
 scope: "description of scope"
 success:
   mode: "task-derived"
