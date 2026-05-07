@@ -1,6 +1,6 @@
 ---
 name: forge
-description: Forge Core protocol plus Claude Code and Codex/manual drivers for task-driven looping with KPI guardrails. Tracks coverage/speed/quality with baselines, rotates strategies on stagnation, derives or records success criteria for the task itself, and uses fresh-context evaluation.
+description: "Task-driven Forge loop with KPI guardrails (coverage/speed/quality). Strategy rotation on stagnation, fresh-context evaluation. Triggers: 'forge it', 'forge this', 'forge loop', 'quality loop', 'kpi loop', 'improvement loop'."
 triggers:
   - "forge it"
   - "forge this"
