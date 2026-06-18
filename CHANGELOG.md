@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-18
+
+### Added
+- **No-cheat invariant** — when an iteration improves a KPI and touched test files, CI config, or thresholds, VERIFY structurally checks the diff did not weaken/skip/delete tests, loosen assertions, lower thresholds, or mock away the behavior under test; implausible KPI jumps auto-escalate to adversarial verification to prove the metric is not gamed. Optional `test_contract` designates files the loop may extend but not weaken (Ralph's read-only tests). Backed by SWE-Marathon (arXiv 2606.07682) and the LM-agent reward-hacking findings (arXiv 2606.15385).
+- **Model tiering** — `model_tiering` capability and protocol section: high-volume worker/finder/builder roles run on a cheap/fast tier while judges, adversarial verifiers, and synthesis run on a strong tier, making parallel rounds economical. Drivers map roles to their own controls (Claude Code Workflow `model`/`effort`).
+- **Cross-session lessons retrieval** — ORIENT pulls relevant prior lessons just-in-time from the project memory ledger that RECORD writes to, so lessons compound across runs instead of dying with the session (`## Lessons Memory`).
+- **Loop telemetry** — `cost_telemetry` capability plus `budget` and `telemetry` state blocks: each RECORD logs per-iteration tokens/cost/wall-clock, and the budget-ceiling stop consumes the cumulative rollup to halt before a projected breach rather than after.
+- **Blast-radius guard** — unattended runs stay within `scope`/`scope_paths` and never take destructive or irreversible git/FS/external actions; a breach pauses (attended) or stops with an honest summary (unattended). New Critical Rule #15 and `scope_paths`/`unattended` state fields.
+
+### Changed
+- `## Verification Depth` now documents the `light`/`review`/`adversarial`/`panel` ladder as the single home for the skeptic/judge concepts; Adaptive Orchestration and the No-Cheat Invariant reference it instead of restating risk factors.
+- Documented the `<promise>…</promise>` control marker in the protocol; standardized the session-ID format to `MMDD-HHMM-SLUG` across SKILL, command, and README; clarified the `quality_gap` normalization.
+- README and the Codex driver prompt brought back in sync with the protocol (full capability matrix, 9 strategies, iteration-1 evaluation, all capability-section pointers).
+
 ## [0.7.0] - 2026-06-18
 
 ### Added

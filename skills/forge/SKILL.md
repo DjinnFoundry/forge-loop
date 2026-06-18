@@ -30,7 +30,8 @@ Forge Core
   ├── Protocol phases (A through H)
   ├── State format and KPI model
   ├── Strategy selection + stagnation logic
-  └── Fresh-context evaluation expectations
+  ├── Capability detection + adaptive orchestration
+  └── Fresh-context evaluation + verification depth
 
 Claude Code driver
   ├── /forge command
@@ -42,9 +43,9 @@ Claude Code driver
 Each iteration (one OODA cycle):
   ├── A. ORIENT   — Read forge-state, understand position + trends, detect capabilities
   ├── B. MEASURE  — Run tests, capture KPIs
-  ├── C. EVALUATE — Every 3rd iteration: fresh-context reality-check subagent
+  ├── C. EVALUATE — Iteration 1 and every 3rd: fresh-context reality-check subagent
   ├── D. DECIDE   — Pick strategy + plan the iteration (mode + verification depth)
-  ├── E. EXECUTE  — Apply ONE coherent improvement (sequential, or best-of-N parallel round)
+  ├── E. EXECUTE  — Apply ONE coherent improvement (sequential, or best of N parallel candidates — accept one)
   ├── F. VERIFY   — Run tests, verify at the planned depth, re-measure KPIs
   ├── G. RECORD   — Update forge-state with deltas + lessons (compact if long)
   └── H. COMPLETE — Task success + KPI guardrails + convergence/budget → FORGE_COMPLETE
@@ -81,7 +82,9 @@ provides, and Forge detects what is available at runtime rather than assuming.
 | `parallel_agents` | Run multiple sub-agents concurrently | Run candidate strategies one at a time |
 | `worktree_isolation` | Give each parallel agent an isolated working copy | Serialize edits on the one tree |
 | `workflow_orchestration` | Deterministic fan-out/fan-in / pipeline primitive | Hand-rolled sequential loop |
+| `model_tiering` | Route different model tiers/effort to different agent roles | Single model for all roles |
 | `ui_quality_tools` | Registered design/UX evaluation tooling | Built-in UI checklist (§ UI Quality Gate) |
+| `cost_telemetry` | Runtime exposes per-iteration token/cost/time usage | Track wall-clock iteration count only |
 
 **Every capability has a fallback.** The protocol NEVER requires parallelism,
 worktrees, or any specific tool. A capability that is absent degrades to its
@@ -95,7 +98,9 @@ sequential equivalent — the loop still converges, just slower.
 | `parallel_agents` | ✅ concurrent subagents / Workflow | 🔸 limited | ⚪ |
 | `worktree_isolation` | ✅ Workflow `isolation: worktree` / `git worktree` | 🔸 manual `git worktree` | ⚪ |
 | `workflow_orchestration` | ✅ Workflow tool (fan-out, pipeline, judge panels) | ⚪ | ⚪ |
+| `model_tiering` | ✅ Workflow `model`/`effort` opts (cheap/fast workers, strong judges) | 🔸 whatever model controls it exposes | ⚪ |
 | `ui_quality_tools` | ✅ if design skills installed | 🔸 if available | ⚪ checklist |
+| `cost_telemetry` | ✅ usage observable | 🔸 partial/manual | ⚪ wall-clock count |
 
 ✅ first-class · 🔸 partial/manual · ⚪ fallback only
 
@@ -107,6 +112,26 @@ primitive, worktree support, registered UI tools) and record a `capabilities`
 block in forge-state. Re-use it on later iterations; re-detect only if the
 environment changed. When in doubt about a capability, treat it as absent and
 take the fallback — correctness over cleverness.
+
+## Model Tiering
+
+When `model_tiering` is available, match model strength/effort to each role. High-volume
+roles (parallel fan-out candidates, loop-until-dry finders) run on a cheap/fast tier;
+correctness-deciding roles run on a strong tier. This is what makes parallel rounds
+economically viable — spend the expensive tokens where correctness is decided, not on
+the dozen workers exploring candidates.
+
+| Role | Tier | Effort |
+|------|------|--------|
+| `worker` / `finder` / `builder` (high volume, fan-out candidates, loop-until-dry finders) | cheap/fast | lower |
+| `reviewer` (fresh-context eval over a diff) | mid | moderate |
+| `judge` / `adversarial verifier` / `synthesis` (where correctness is decided) | strong | higher |
+| main loop / driver agent | as configured | as configured |
+
+Do not cheap out on the strong-tier roles — a gamed metric that a cheap judge waves
+through costs more than the tokens it saved. Drivers map these to their own controls
+(Claude Code: Workflow `model`/`effort`; Codex: its model options). When `model_tiering`
+is absent, everything runs on one model and that is fine — **never block on tiering.**
 
 ## Adaptive Orchestration
 
@@ -122,17 +147,13 @@ in forge-state:
    - **Parallel round** when `parallel_agents` is available AND there are ≥2
      independent, high-value gaps/strategies AND the scope decomposes into
      non-conflicting areas. Fan out one agent per strategy/dimension, then
-     fan in (§ Parallel Rounds). This is the screenshot: `Round N · K agents`.
+     fan in (§ Parallel Rounds) — a `Round N · K agents` view.
    - **Sequential** when one gap dominates, the change is tightly coupled, the
      capability is absent, or you are doing final polish near completion.
 
-2. **Verification depth** — how skeptically to check the result (§ Verification Depth)
-   - Scale to the change's **risk**: blast radius (files/LOC touched),
-     criticality (auth, data, money, migrations, public API), KPI surprise
-     (a suspiciously large jump), and reversibility.
-   - Low risk → tests + light self-review. Medium → fresh-context review.
-     High/critical or surprising KPIs → adversarial verification. Competing
-     candidates → judge panel.
+2. **Verification depth** — how skeptically to check the result
+   - Score the change's risk and pick a depth (`light` / `review` / `adversarial`
+     / `panel`) per § Verification Depth.
    - Spend verification where it is *worth it*. Don't gate a typo fix behind a
      judge panel; don't let a migration through on a self-review.
 
@@ -167,6 +188,7 @@ State file path (substitute your session ID for `{sid}`):
 - If `completion_checks` is empty, derive them before EXECUTE and persist them in forge-state
 - Check `stagnation_count` — if >= 3, MUST rotate strategy
 - Review lessons from previous iterations (avoid repeating failures)
+- **Retrieve cross-session lessons** (first iteration only): pull relevant prior lessons just-in-time from the project memory ledger that RECORD writes to (same fallback chain — § G. RECORD step "Persist project insights"). This is the read side of the loop RECORD writes: one ledger, written in RECORD, read here. Load ONLY lessons relevant to the current `scope`/`task` (JIT — never dump the whole ledger into context), and fold them into the lessons Forge consults in DECIDE alongside this run's own.
 - **UI detection** (first iteration only): Scan `scope` and `task` for UI signals:
   - File patterns: `*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.css`, `*.scss`, `*.html`
   - Task keywords: component, page, interface, design, layout, style, UI, UX, responsive, animation, frontend, theme, color, typography
@@ -258,7 +280,7 @@ This prevents complexity ratchet. Code removal for equivalent performance is alw
 1. Compute **normalized KPI gap** for each target:
    - coverage_gap = (target - current) / target
    - speed_gap = (current - target) / current  (inverted — lower is better)
-   - quality_gap = high_findings / 5  (scale 0..1)
+   - quality_gap = min(high_findings, 5) / 5  (normalized 0..1; high findings dominate the gate — completion still requires high_findings == 0)
    - ui_quality_gap = (threshold - ui_quality_score) / threshold  (UI tasks only; 0 if not ui_task or score is null)
 
 2. **Largest gap** gets priority in strategy selection:
@@ -269,10 +291,7 @@ This prevents complexity ratchet. Code removal for equivalent performance is alw
 
 3. **High findings from reality-check** → immediate `component-extraction` or `refactor-for-testability`
 
-4. **Stagnation** (stagnation_count >= 3):
-   - Pick best historical delta strategy OR untried strategy
-   - Log: "Strategy '{current}' stagnating, switching to '{new}'"
-   - Reset stagnation_count
+4. **Stagnation** (stagnation_count >= 3) → rotate strategy per § Stagnation Protocol.
 
 5. **Never repeat a strategy that yielded negative deltas** without changing approach
 
@@ -285,9 +304,8 @@ iteration per § Adaptive Orchestration, and persist it as `iteration_plan`:
 - **verify_depth**: `light` | `review` | `adversarial` | `panel` (from the change's risk)
 - **discovery**: `bounded` or `loop-until-dry` (for unknown-size find tasks)
 
-Pick `parallel` only when the runtime supports it AND there are ≥2 independent,
-non-conflicting, high-value strategies. Otherwise stay sequential — the default is
-always safe. Write a one-line rationale so the choice is auditable from state.
+Choose each per § Adaptive Orchestration — sequential is always the safe default.
+Write a one-line rationale so the choice is auditable from state.
 
 ### E. EXECUTE — ONE Coherent Improvement
 
@@ -295,6 +313,9 @@ Each iteration produces ONE coherent improvement. In `sequential` mode that is o
 focused change. In `parallel` mode it is the **best of N candidate changes** from a
 fan-out round (§ Parallel Rounds) — still one improvement accepted per iteration, just
 explored in parallel first. Never batch unrelated changes into a single accepted result.
+
+Before applying changes, confirm they stay within the blast radius (§ Blast-Radius Guard):
+in scope, and no destructive/irreversible git, FS, or external actions — pause instead.
 
 **Sequential change** — do the one thing well:
 
@@ -325,6 +346,11 @@ scrutiny — escalate to an adversarial pass that tries to *refute* the improvem
 its KPI claim before you accept it. If the refutation lands, treat it like a red test:
 fix or revert before RECORD. Never let a fabricated or fragile "green" through.
 
+**No-cheat check** (§ No-Cheat Invariant): when this iteration touched test files / CI
+config / thresholds / quality gates, or a KPI jumped implausibly, run the no-cheat
+invariant before accepting. A weakened test contract or a fake metric is rejected like a
+red test.
+
 **UI/UX quality gate** (when `ui_task: true`): After tests pass, run the UI quality check per § UI Quality Gate. Record the resulting `ui_quality_score`. A score below 50 is a critical failure — fix before RECORD, same as red tests. For interaction/flow changes, also verify the UX path end-to-end (the change does what a user needs, not just that it renders).
 
 ### G. RECORD — Update Forge State (THE Autoregressive Step)
@@ -341,6 +367,7 @@ Update the Forge state file for the current driver (using your session ID `{sid}
    - Actions taken (brief)
    - Success contract progress or refinement if it changed
    - Findings count (if evaluation ran)
+   - **Telemetry** — when `cost_telemetry` is available, record this iteration's tokens, cost (if known), and wall-clock duration (for a parallel round, the round's aggregate across fan-out agents); otherwise record at least the iteration index and elapsed wall-clock. Add it to the `telemetry` rollup; consumed by § Convergence and Stopping (Budget ceiling).
    - Lesson learned
 
 2. **Update strategy tracking**:
@@ -370,6 +397,7 @@ Update the Forge state file for the current driver (using your session ID `{sid}
    - Check CLAUDE.md for memory conventions → check `.claude/memory/` → check `docs/`
    - Fall back: append under `## Lessons` in `AGENT.md`
    - Write only facts useful to any future agent, not forge-process observations (those stay in forge-state)
+   - These insights are the durable cross-run store: ORIENT retrieves them JIT on future runs (§ A. ORIENT step "Retrieve cross-session lessons")
 
 8. **Compact state if long** — keep the autoregressive memory lean for long runs (§ State Compaction):
    - When the iteration log exceeds ~25 entries (or the file grows unwieldy), archive the
@@ -401,6 +429,20 @@ were not).
 
 Otherwise → exit normally (stop hook re-injects prompt for next iteration)
 
+**Control markers** (output on their own line, never quoted): `FORGE_COMPLETE` ends the
+loop; `FORGE_PAUSE` suspends it for user input. If the driver was launched with an
+explicit completion promise, the loop ends instead by emitting `<promise>TEXT</promise>`
+(the exact promise text) — output it ONLY when that promise is literally true.
+
+## Lessons Memory
+
+Lessons live at two scopes. The forge-state `lessons` list is per-run and ephemeral — it
+dies with the session. The project memory ledger (fallback chain in § G. RECORD,
+"Persist project insights") is the durable cross-run store: RECORD writes durable,
+project-level facts there, and ORIENT pulls the relevant ones forward JIT on the first
+iteration of a future run (§ A. ORIENT). This closes the loop so lessons compound across
+sessions instead of being trapped in one transcript.
+
 ## Stagnation Protocol
 
 ```
@@ -426,7 +468,7 @@ When stagnation triggers (or when you run out of ideas within a strategy):
 ## Parallel Rounds
 
 A parallel round explores several improvements at once, then accepts the single best —
-the `Round N · K agents` view from the screenshot. It is an *opt-in acceleration* of a
+a `Round N · K agents` view. It is an *opt-in acceleration* of a
 sequential iteration, chosen adaptively in DECIDE, never a change to the keep-one
 discipline. Requires `parallel_agents`; without it, fall back to trying candidates
 sequentially.
@@ -437,7 +479,9 @@ sequentially.
    `strategy-security`, `coverage-push`). Each must be able to succeed without
    conflicting with the others.
 2. Spawn one agent per dimension, **each in worktree isolation** if `worktree_isolation`
-   is available (so concurrent edits never collide). Label them `rN:dimension` for legibility.
+   is available (so concurrent edits never collide). Run these workers on the cheap/fast
+   tier and reserve the strong tier for the fan-in judge panel (§ Model Tiering). Label
+   them `rN:dimension` for legibility.
 3. Each agent produces a complete, self-contained candidate change and runs tests on it.
    Agents that go red or empty-handed simply drop out of the round.
 
@@ -480,6 +524,45 @@ before accepting.
 
 UI/UX changes verify on their own axis (§ UI Quality Gate) in addition to the above.
 
+## No-Cheat Invariant
+
+The loop must never improve a KPI by weakening the test contract. Going green by
+deleting the assertion that was red is not progress — it is reward hacking, and it
+emerges structurally, not from bad intent (SWE-Marathon found ~10% of agent rollouts
+ship verifier bypasses; reward hacking resists soft "please don't" mitigations). Forge
+defends against it structurally, in VERIFY.
+
+**Trigger.** Whenever an iteration improves green/coverage/quality AND it touched test
+files, CI config, coverage thresholds, or quality gates, VERIFY MUST inspect the diff and
+confirm the change did NOT:
+
+- weaken or remove assertions (loosen matchers, widen tolerances, assert less)
+- skip / xfail / `.only` / delete / comment-out tests
+- lower a coverage or quality threshold, or relax a CI gate
+- mock or stub away the real behavior under test
+- add `--no-verify`, `--no-strict`, or any skip/bypass flag
+
+Any of these is treated exactly like a red test: **reject/revert before RECORD.** A
+genuine fix adds or strengthens the contract; it never shrinks it to fit the result.
+
+**KPI provenance.** KPI deltas must come from real, unmodified test runs. A delta that is
+too good to be true — coverage leaping implausibly, speed collapsing with no structural
+reason, failures vanishing without a corresponding fix — auto-escalates that iteration's
+`verify_depth` to `adversarial` (§ Verification Depth). The skeptic's explicit job is then
+to **prove the metric is fake or gamed**, not merely review the diff.
+
+**Test contract.** The scope (or the user, via `test_contract` in forge-state) may
+designate test files as the contract the loop may *extend but not weaken* — Ralph's
+"read-only test files." This is optional and lightweight. When no contract is declared,
+the default heuristic is: **treat the existing test assertions as the contract.** New
+tests and stronger assertions are always welcome; removing or loosening existing ones is a
+no-cheat violation unless the underlying behavior was itself intentionally removed (and
+that intent is recorded).
+
+**Sequential fallback.** If no adversarial capability is available, run a structured
+self-audit of the diff against the checklist above before accepting — the same questions,
+asked of yourself, with "rejected unless clearly clean" as the default verdict.
+
 ## Convergence and Stopping
 
 Forge stops on success (H. COMPLETE) — but a loop that cannot reach success must still
@@ -489,15 +572,44 @@ end gracefully rather than burn forever. Track these alongside the success contr
   counter rotates strategy at 3 low-delta iterations. For discovery tasks, run finders
   until **K consecutive dry rounds** (default 2) return nothing new, then stop — don't
   guess a fixed iteration count. A parallel round that yields 0 survivors counts as dry.
-- **Budget ceiling** — respect any token/cost/time cap the runtime or user sets. When the
+- **Budget ceiling** — respect any token/cost/time cap (`budget` block in forge-state, or
+  one the runtime sets). Consume the recorded `telemetry` rollup (written each RECORD,
+  § G. RECORD): track cumulative spend, estimate the next round's cost from the running
+  average per iteration, and stop *before* a projected breach rather than after. When the
   remaining budget can't fund another useful round, stop and summarize what was achieved
-  and what remains. Never blow a hard ceiling chasing the last KPI point.
+  and what remains. Never blow a hard ceiling chasing the last KPI point. When
+  `cost_telemetry` is absent, fall back to the wall-clock iteration count against any
+  time/iteration cap.
 - **Goal drift** — each iteration, re-check that the work still serves the success
   contract. If recent iterations have wandered into unrelated polish, stop and flag the
   drift rather than continuing to optimize the wrong thing.
 
 On any of these, output `FORGE_COMPLETE` with an honest status — "converged short of
 target X; remaining work: Y" — never a false claim of completion.
+
+## Blast-Radius Guard
+
+Unattended overnight loops need guardrails against runaway, destructive, and
+scope-creeping actions. The guard is strictest in **unattended** runs (hook-driven, no
+human watching); when a human is in the loop, borderline actions may ask instead of
+hard-stop. Apply it before every EXECUTE.
+
+- **Stay within scope** — edits should fall within the declared `scope` (and
+  `scope_paths` when set). Touching files clearly outside scope requires an explicit
+  allowance in the success contract; otherwise pause (`FORGE_PAUSE`, attended) rather than
+  silently expand the blast radius. Don't grow the footprint to chase a KPI.
+- **No destructive/irreversible git or FS ops** — never force-push, never rewrite
+  published history, never delete branches, and never `git reset --hard` / `checkout` /
+  remove untracked files in a way that discards work outside this iteration's own changes.
+  This complements the "Clean revert" step (§ G. RECORD): a revert touches **only** the
+  files this iteration changed, and stops if that set can't be identified safely.
+- **Irreversible external actions** — anything outward-facing or hard to undo (deploys,
+  publishing, destructive DB ops, deleting data) → stop/pause for confirmation rather than
+  proceed, especially in unattended mode.
+
+A guard breach is a graceful-stop condition (§ Convergence and Stopping): in attended runs
+`FORGE_PAUSE` for confirmation; in unattended runs stop with an honest summary of what was
+blocked and why. Never punch through the guard to finish the task.
 
 ## State Compaction
 
@@ -600,13 +712,25 @@ targets:
   quality: "moderate"
   max_iterations: 20
   ui_quality_threshold: 80    # applies when ui_task: true (configurable in AGENT.md)
+budget:                       # optional hard caps (§ Convergence and Stopping); any/all may be null
+  max_tokens: null
+  max_cost: null
+  max_wall_seconds: null
 ui_task: false                # set true in ORIENT if UI signals detected
+test_contract: null           # paths the loop may extend but not weaken (§ No-Cheat Invariant); null = infer from existing tests
+scope_paths: null             # paths the loop may edit (§ Blast-Radius Guard); null = infer from scope
+unattended: true              # hook-driven runs default true → stricter guard (§ Blast-Radius Guard)
 capabilities:                 # detected in ORIENT (§ Runtime Capabilities)
   fresh_context_eval: true
   parallel_agents: true
   worktree_isolation: true
   workflow_orchestration: true
+  model_tiering: true
   ui_quality_tools: false
+model_tiers:                  # optional (§ Model Tiering); values are driver-specific; omit when model_tiering absent
+  worker: "cheap/fast tier, lower effort"
+  reviewer: "mid tier"
+  judge: "strong tier, higher effort"
 iteration_plan:               # set in DECIDE each iteration (§ Adaptive Orchestration)
   mode: "sequential"          # sequential | parallel
   parallel_dimensions: []     # e.g. ["data-integrity", "test-trust"] when mode: parallel
@@ -614,6 +738,10 @@ iteration_plan:               # set in DECIDE each iteration (§ Adaptive Orches
   discovery: "bounded"        # bounded | loop-until-dry
   rationale: "single dominant coverage gap; review depth (moderate blast radius)"
 dry_rounds: 0                 # consecutive rounds that yielded nothing (loop-until-dry)
+telemetry:                    # cumulative rollup, updated each RECORD (§ G. RECORD); consumed by § Convergence and Stopping
+  tokens_spent: 0
+  cost_spent: 0
+  wall_seconds: 0
 current_strategy: "coverage-push"
 stagnation_count: 0
 strategies_tried:
@@ -621,7 +749,7 @@ strategies_tried:
     iterations: [1, 2]
     coverage_delta: 0.8
     speed_delta: -5
-lessons:
+lessons:                      # session-scoped; durable ones are mirrored to the project ledger and pulled forward JIT by ORIENT (§ A. ORIENT, § G. RECORD)
   - "async:true on LiveView tests saves ~3s per file"
 ideas:
   - "consolidate 3 similar fixture helpers into one parameterized function"
@@ -635,6 +763,7 @@ ideas:
 - UI Quality: n/a (not ui_task)
 - Actions: Added 15 tests for data_loaders.ex edge cases
 - Reality-check: 2 high, 3 medium findings
+- Telemetry: 48k tokens, $0.21, 96s wall (cumulative: 48k / $0.21 / 96s)
 - Lesson: "data_loaders has 7 identical try-rescue - extract, don't test each"
 ```
 
@@ -661,6 +790,8 @@ ideas:
 11. **Task success comes first** — KPIs are guardrails, not a substitute for actually finishing the requested work.
 12. **Use what the runtime gives you** — detect capabilities, prefer parallel/worktree/judge-panel power when present, degrade gracefully when absent. The sequential default is always correct.
 13. **Verify proportionate to risk** — cheap checks for cheap changes; adversarial refutation for risky ones or suspiciously good KPIs. Never trust a green you did not try to break.
+14. **Never weaken the test contract to move KPIs** — going green by removing/loosening assertions, skipping or deleting tests, lowering thresholds, mocking away the behavior under test, or adding skip flags is reward hacking. Reject it like a red test (§ No-Cheat Invariant). Extend the contract, never shrink it.
+15. **Stay within blast radius** — no out-of-scope edits and no destructive/irreversible git, FS, or external actions in unattended runs. Pause (or stop with an honest summary) instead of expanding the footprint or punching through (§ Blast-Radius Guard).
 
 ## Support posture
 

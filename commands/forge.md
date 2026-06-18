@@ -30,7 +30,7 @@ If SCOPE is missing, ask what area to focus on.
 ## Launch Sequence
 
 1. **Measure baseline**: Run test suite with coverage, parse coverage/speed/tests/failures
-2. **Generate session ID**: `MMDD-HHMM-XXXX` format
+2. **Generate session ID**: `MMDD-HHMM-SLUG` format (SLUG = 2-3 words from the task)
 3. **Establish success contract**:
    - primary task: `SCOPE`
    - explicit success override: `--done-when "TEXT"` if provided
@@ -53,20 +53,22 @@ SESSION: {session_id}
 DONE WHEN: {explicit done_when or derive from task and record in forge-state}
 
 You are in a forge loop. Each iteration:
-A. ORIENT - Read forge-state, check position + trends + stagnation; on iteration 1 detect runtime capabilities (subagents, parallel/Workflow, worktrees, UI tools)
+A. ORIENT - Read forge-state, check position + trends + stagnation; on iteration 1 detect runtime capabilities (subagents, parallel/Workflow, worktrees, UI tools) and retrieve relevant prior lessons JIT from the project memory ledger
 B. MEASURE - Run tests with coverage, capture KPIs
 C. EVALUATE - If iteration 1 or every 3rd: spawn fresh-context subagent on SCOPE
 D. DECIDE - Pick strategy + plan the iteration (mode: sequential|parallel, verify_depth: light|review|adversarial|panel) from KPI gaps + findings + lessons + capabilities
-E. EXECUTE - ONE coherent improvement: a focused change, or the best of a parallel fan-out round (worktree-isolated) when parallel is warranted
+E. EXECUTE - ONE coherent improvement: a focused change, or the best of a parallel fan-out round (worktree-isolated, cheap-tier workers + strong-tier judge panel) when parallel is warranted
 F. VERIFY - Tests must be green; verify at the planned depth (escalate to adversarial refutation for risky/surprising changes); re-measure with coverage
 G. RECORD - Update forge-state with deltas + lessons (autoregressive step); compact the log if it grows long
 H. COMPLETE - Task success contract satisfied AND KPI targets met (or convergence/budget stop reached)? → output FORGE_COMPLETE on its own line
 
-Refer to the forge skill for the full protocol (§ Runtime Capabilities, § Adaptive Orchestration, § Parallel Rounds, § Verification Depth, § Convergence and Stopping).
+Refer to the forge skill for the full protocol (§ Runtime Capabilities, § Model Tiering, § Adaptive Orchestration, § Parallel Rounds, § Verification Depth, § No-Cheat Invariant, § Convergence and Stopping, § Blast-Radius Guard).
 
 CRITICAL: Do NOT skip steps. Accept ONE coherent improvement per iteration (explore candidates in parallel if you like, but keep only the best).
 CRITICAL: Use the runtime's capabilities when present; degrade gracefully when absent. Sequential is always a safe default.
 CRITICAL: Parse KPIs from actual test output. Never fabricate numbers. Verify proportionate to risk — never trust a green you did not try to break.
+CRITICAL: Never weaken/skip/delete tests, loosen assertions, lower thresholds, or mock away behavior to go green — that is reward hacking; reject it like a red test.
+CRITICAL: Stay within blast radius — no out-of-scope edits and no destructive/irreversible git, FS, or external actions in unattended runs; pause instead.
 CRITICAL: If tests are red after EXECUTE, fix before RECORD.
 CRITICAL: Output control markers (`FORGE_COMPLETE`, `FORGE_PAUSE`, `<promise>...</promise>`) on their own line.
 ```

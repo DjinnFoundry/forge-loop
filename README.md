@@ -21,7 +21,7 @@
 **A task loop with KPI guardrails for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex/manual workflows.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.7.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.8.0-green.svg)](CHANGELOG.md)
 
 Forge is a protocol plus adapters. It takes open-text software tasks, keeps coverage/speed/quality as guardrails, records state across iterations, and runs until the work is honestly done or you stop it.
 
@@ -122,7 +122,7 @@ Each iteration executes one complete eight-phase cycle:
 |-------|-------------|
 | **A. Orient** | Read forge-state file, check task success contract + KPI trends + stagnation count; on iteration 1, detect runtime capabilities |
 | **B. Measure** | Run tests with coverage, capture KPIs |
-| **C. Evaluate** | Every 3rd iteration: spawn fresh-context subagent for unbiased audit |
+| **C. Evaluate** | Iteration 1 and every 3rd: spawn fresh-context subagent for unbiased audit |
 | **D. Decide** | Pick strategy **and plan the iteration** — sequential vs. parallel fan-out, and how hard to verify |
 | **E. Execute** | Apply ONE coherent improvement (a focused change, or the best of a parallel round) |
 | **F. Verify** | Tests must be green; verify at the planned depth (up to adversarial refutation); re-measure KPIs |
@@ -152,6 +152,7 @@ Forge selects from named strategies based on which KPI gap is largest:
 | `dead-code-removal` | Unused code flagged by evaluation | Quality + Coverage |
 | `quality-polish` | Naming, complexity, clarity | Quality |
 | `design-system` | Duplicated UI patterns | Quality + Coverage |
+| `ui-quality` | UI task, largest UI-quality gap | UI quality score |
 | `simplification` | Code that can be made simpler | Quality |
 
 ### Stagnation Detection
@@ -160,7 +161,7 @@ When coverage improves by less than 0.1% for two consecutive iterations, forge i
 
 ### Fresh-Context Evaluation
 
-Every 3rd iteration, Forge runs a fresh-context audit pass. In Claude Code this is typically a subagent; in other environments it may be an isolated reviewer or manual second pass. The protocol requires fresh context, not a specific vendor primitive.
+On iteration 1 and every 3rd thereafter, Forge runs a fresh-context audit pass. In Claude Code this is typically a subagent; in other environments it may be an isolated reviewer or manual second pass. The protocol requires fresh context, not a specific vendor primitive.
 
 ### Capability-Aware, Adaptive
 
@@ -172,16 +173,21 @@ Forge is single-agent and sequential **by default** — it always works that way
 | Parallel sub-agents | ✅ | 🔸 limited | ⚪ |
 | Worktree isolation | ✅ | 🔸 manual | ⚪ |
 | Workflow orchestration | ✅ | ⚪ | ⚪ |
+| Model tiering | ✅ | 🔸 | ⚪ single model |
 | UI quality tools | ✅ if installed | 🔸 | ⚪ checklist |
+| Cost telemetry | ✅ | 🔸 | ⚪ wall-clock |
 
 ✅ first-class · 🔸 partial/manual · ⚪ sequential fallback
 
 Each iteration, Forge plans **how** to run, proportionate to opportunity and risk:
 
 - **Parallel rounds** — when several independent, high-value strategies exist and the runtime supports it, Forge fans out one worktree-isolated agent per dimension (`Round N · K agents`), then a judge panel keeps only the best change. One coherent improvement is still accepted per iteration.
-- **Verification depth** — green tests are the floor. Trivial changes get a light self-review; risky or suspiciously-good ones get an **adversarial pass** that tries to refute the change and its KPI claim before it is trusted. No fake-green.
-- **Convergence & stopping** — beyond KPI targets, Forge stops gracefully on no-progress (loop-until-dry), a token/cost budget ceiling, or detected goal drift — always with an honest summary, never a false claim of completion.
-- **State compaction** — long runs stay lean: old narration is archived while decisions, lessons, and the success contract are preserved.
+- **Model tiering** — high-volume worker/finder agents run on a cheap/fast tier; judges and adversarial verifiers run on a strong tier, so parallel rounds stay economical without cheaping out where correctness is decided.
+- **Verification depth** — green tests are the floor. Trivial changes get a light self-review; risky or suspiciously-good ones get an **adversarial pass** that tries to refute the change and its KPI claim before it is trusted.
+- **No-cheat invariant** — going green by weakening the test contract (loosened assertions, skipped/deleted tests, lowered thresholds, mocked-away behavior) is treated as reward hacking and rejected like a red test.
+- **Convergence & stopping** — beyond KPI targets, Forge stops gracefully on no-progress (loop-until-dry), a token/cost budget ceiling (informed by per-iteration telemetry), or detected goal drift — always with an honest summary, never a false claim of completion.
+- **Blast-radius guard** — unattended runs stay within scope and never take destructive or irreversible git/FS/external actions; they pause for confirmation instead.
+- **Cross-session lessons & state compaction** — durable lessons are pulled forward just-in-time on future runs, and long runs stay lean as old narration is archived while decisions, lessons, and the success contract are preserved.
 
 Every capability has a fallback. Nothing in the protocol *requires* parallelism, worktrees, or any specific tool — absent a capability, Forge degrades to its sequential equivalent and still converges.
 
@@ -311,9 +317,11 @@ still accepted for compatibility.
 
 Other runtimes can reuse the same format in a different state root. Each iteration appends its KPIs, strategy, actions, and lessons. This is the autoregressive memory.
 
+The example below is abbreviated — see `skills/forge/SKILL.md` (§ Forge State File Format) for the full schema, including the optional `capabilities`, `model_tiers`, `iteration_plan`, `budget`, `telemetry`, `test_contract`, `scope_paths`, and `unattended` fields.
+
 ```yaml
 ---
-session_id: "0320-1430-a3b2"
+session_id: "0320-1430-api-controllers"  # MMDD-HHMM-SLUG
 scope: "API controllers"
 success:
   mode: "task-derived"
@@ -414,8 +422,8 @@ Distilled from Ralph, autoresearch, pi-autoresearch, SICA, and a dozen related l
 | Aspect | Raw loop | Forge |
 |--------|----------|-------|
 | KPI tracking | Ad-hoc | Structured state file with deltas + trends |
-| Strategy | Single prompt | 8 named strategies, auto-rotation on stagnation |
-| Evaluation | Self-evaluation (anchoring bias) | Fresh-context audits every 3 iterations |
+| Strategy | Single prompt | 9 named strategies, auto-rotation on stagnation |
+| Evaluation | Self-evaluation (anchoring bias) | Fresh-context audits on iteration 1 and every 3rd |
 | Memory | Context window only | Persistent state file survives compaction |
 | Completion | Manual / hope | Exact completion marker after task success plus protocol checks |
 | Lessons | Lost between iterations | Accumulated, inform strategy selection |
