@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-06-18
+
+### Added
+- **Capability-aware runtime model** — the protocol now declares its powers abstractly (fresh-context eval, parallel sub-agents, worktree isolation, workflow orchestration, UI tools) and each driver maps them to what the host actually provides. Forge detects available capabilities on the first iteration and records them in forge-state. Every capability has a sequential fallback; nothing is required.
+- **Adaptive Orchestration** — each iteration Forge plans *how* to run (sequential vs. parallel round) and *how hard* to verify (light / review / adversarial / panel), proportionate to opportunity and risk, and records the plan as `iteration_plan`.
+- **Parallel rounds** — opt-in fan-out of K worktree-isolated candidate agents (one per strategy/dimension), with a judge-panel fan-in that keeps only the best change. Still one coherent improvement accepted per iteration.
+- **Adversarial verification depth** — risky or suspiciously-good changes are checked by independent skeptics that try to refute the change and its KPI claim before acceptance, guarding against fake-green.
+- **Convergence and stopping** — graceful stops on no-progress (loop-until-dry), token/cost budget ceilings, and detected goal drift, always with an honest status summary.
+- **UI/UX verification** — the quality gate now also covers interaction/flow paths, not just static rendering.
+- **State compaction** — long runs archive old per-iteration narration to `forge-state.{sid}.archive.md` while preserving baseline, targets, contract, capabilities, deltas, ideas, and live lessons.
+
+### Changed
+- Critical Rule #1 is now "ONE coherent improvement per iteration" — parallel mode may explore N candidates but accepts exactly one.
+- Claude Code and Codex driver prompts now detect capabilities, plan the iteration, and verify proportionate to risk; the stop-hook loop mechanics are unchanged and fully backward compatible.
+
 ## [0.6.0] - 2026-03-20
 
 ### Added

@@ -13,7 +13,7 @@ triggers:
 
 # The Forge — Core Protocol Plus Claude Code and Codex Drivers
 
-A structured, task-driven improvement protocol with KPI guardrails. Forge tracks coverage/speed/quality with baselines and targets, derives or records success criteria for the task itself, evaluates with fresh-context audits, rotates strategies when stagnating, and records lessons across iterations.
+A structured, task-driven improvement protocol with KPI guardrails. Forge tracks coverage/speed/quality with baselines and targets, derives or records success criteria for the task itself, evaluates with fresh-context audits, rotates strategies when stagnating, and records lessons across iterations. It is single-agent and sequential by default, but **capability-aware**: when the runtime offers parallel sub-agents, worktree isolation, or judge panels, Forge adaptively fans out and verifies harder — spending effort proportionate to opportunity and risk.
 
 Built on the Ralph Wiggum loop pattern (Geoff Huntley), informed by Karpathy's autoregressive philosophy, pi-autoresearch's measurement discipline, and SICA's compounding iteration approach.
 
@@ -40,14 +40,14 @@ Claude Code driver
   └── Stop hook re-injects prompt on session exit
 
 Each iteration (one OODA cycle):
-  ├── A. ORIENT   — Read forge-state, understand position + trends
+  ├── A. ORIENT   — Read forge-state, understand position + trends, detect capabilities
   ├── B. MEASURE  — Run tests, capture KPIs
   ├── C. EVALUATE — Every 3rd iteration: fresh-context reality-check subagent
-  ├── D. DECIDE   — Pick strategy + target from KPI gaps + findings
-  ├── E. EXECUTE  — Apply ONE focused transformation
-  ├── F. VERIFY   — Run tests, re-measure KPIs
-  ├── G. RECORD   — Update forge-state with deltas + lessons
-  └── H. COMPLETE — Task success + KPI guardrails satisfied? → FORGE_COMPLETE
+  ├── D. DECIDE   — Pick strategy + plan the iteration (mode + verification depth)
+  ├── E. EXECUTE  — Apply ONE coherent improvement (sequential, or best-of-N parallel round)
+  ├── F. VERIFY   — Run tests, verify at the planned depth, re-measure KPIs
+  ├── G. RECORD   — Update forge-state with deltas + lessons (compact if long)
+  └── H. COMPLETE — Task success + KPI guardrails + convergence/budget → FORGE_COMPLETE
 ```
 
 ## Driver model
@@ -65,6 +65,84 @@ Forge currently ships two first-class drivers:
 
 Other environments can reuse Forge Core manually, but should not be described as
 officially supported unless they ship a real driver.
+
+## Runtime Capabilities
+
+Forge Core is single-agent and sequential by default — it always works that way.
+But when the runtime offers more, Forge uses more. The protocol describes
+capabilities *abstractly*; each driver maps them to whatever the host actually
+provides, and Forge detects what is available at runtime rather than assuming.
+
+### Abstract capabilities
+
+| Capability | Meaning | Sequential fallback |
+|------------|---------|---------------------|
+| `fresh_context_eval` | Spawn an isolated reviewer/auditor with no loop state | Self-review against a checklist |
+| `parallel_agents` | Run multiple sub-agents concurrently | Run candidate strategies one at a time |
+| `worktree_isolation` | Give each parallel agent an isolated working copy | Serialize edits on the one tree |
+| `workflow_orchestration` | Deterministic fan-out/fan-in / pipeline primitive | Hand-rolled sequential loop |
+| `ui_quality_tools` | Registered design/UX evaluation tooling | Built-in UI checklist (§ UI Quality Gate) |
+
+**Every capability has a fallback.** The protocol NEVER requires parallelism,
+worktrees, or any specific tool. A capability that is absent degrades to its
+sequential equivalent — the loop still converges, just slower.
+
+### Driver capability map
+
+| Capability | Claude Code | Codex | Protocol-only |
+|------------|:-----------:|:-----:|:-------------:|
+| `fresh_context_eval` | ✅ subagents | ✅ subagents | ⚪ self-review |
+| `parallel_agents` | ✅ concurrent subagents / Workflow | 🔸 limited | ⚪ |
+| `worktree_isolation` | ✅ Workflow `isolation: worktree` / `git worktree` | 🔸 manual `git worktree` | ⚪ |
+| `workflow_orchestration` | ✅ Workflow tool (fan-out, pipeline, judge panels) | ⚪ | ⚪ |
+| `ui_quality_tools` | ✅ if design skills installed | 🔸 if available | ⚪ checklist |
+
+✅ first-class · 🔸 partial/manual · ⚪ fallback only
+
+### Detection (ORIENT, first iteration)
+
+Do not assume — **detect**. On the first iteration, inventory what the current
+runtime exposes (available agent/subagent tools, an orchestration/workflow
+primitive, worktree support, registered UI tools) and record a `capabilities`
+block in forge-state. Re-use it on later iterations; re-detect only if the
+environment changed. When in doubt about a capability, treat it as absent and
+take the fallback — correctness over cleverness.
+
+## Adaptive Orchestration
+
+This is the brain that makes Forge "smart enough to decide what to run when."
+Running every check on every change is wasteful; running none is reckless.
+Each iteration, after sizing the KPI gaps, Forge plans *how* to execute and
+*how hard* to verify, proportional to opportunity and risk.
+
+The plan has three dimensions, decided in DECIDE and recorded as `iteration_plan`
+in forge-state:
+
+1. **Execution mode** — sequential vs. parallel round
+   - **Parallel round** when `parallel_agents` is available AND there are ≥2
+     independent, high-value gaps/strategies AND the scope decomposes into
+     non-conflicting areas. Fan out one agent per strategy/dimension, then
+     fan in (§ Parallel Rounds). This is the screenshot: `Round N · K agents`.
+   - **Sequential** when one gap dominates, the change is tightly coupled, the
+     capability is absent, or you are doing final polish near completion.
+
+2. **Verification depth** — how skeptically to check the result (§ Verification Depth)
+   - Scale to the change's **risk**: blast radius (files/LOC touched),
+     criticality (auth, data, money, migrations, public API), KPI surprise
+     (a suspiciously large jump), and reversibility.
+   - Low risk → tests + light self-review. Medium → fresh-context review.
+     High/critical or surprising KPIs → adversarial verification. Competing
+     candidates → judge panel.
+   - Spend verification where it is *worth it*. Don't gate a typo fix behind a
+     judge panel; don't let a migration through on a self-review.
+
+3. **Discovery mode** — bounded vs. loop-until-dry
+   - When the task is "find an unknown-size set" (bugs, coverage gaps, UX
+     issues) and `parallel_agents` is available, run loop-until-dry finders
+     (§ Convergence and Stopping) instead of guessing a fixed count.
+
+Record the chosen plan and a one-line rationale. The plan is a decision Forge
+must be able to defend from the recorded state, not a vibe.
 
 ## The Forge Protocol
 
@@ -94,6 +172,10 @@ State file path (substitute your session ID for `{sid}`):
   - Task keywords: component, page, interface, design, layout, style, UI, UX, responsive, animation, frontend, theme, color, typography
   - If detected: set `ui_task: true` and `ui_quality_score: null` in forge-state
   - Check AGENT.md for a `## UI Quality Tools` section and note which commands are registered
+- **Capability detection** (first iteration only): inventory what this runtime exposes
+  (§ Runtime Capabilities) — subagents, a parallel/workflow orchestration primitive,
+  worktree isolation, registered UI tools. Record a `capabilities` block in forge-state.
+  When uncertain, treat a capability as absent and use its sequential fallback.
 
 ### B. MEASURE — Capture Current KPIs
 
@@ -194,9 +276,27 @@ This prevents complexity ratchet. Code removal for equivalent performance is alw
 
 5. **Never repeat a strategy that yielded negative deltas** without changing approach
 
-### E. EXECUTE — ONE Focused Change
+#### Plan the iteration (adaptive)
 
-Each iteration does ONE thing well:
+Once the strategy (or candidate strategies) are chosen, decide *how* to run this
+iteration per § Adaptive Orchestration, and persist it as `iteration_plan`:
+
+- **mode**: `sequential` or `parallel` (and, if parallel, the K dimensions/strategies to fan out)
+- **verify_depth**: `light` | `review` | `adversarial` | `panel` (from the change's risk)
+- **discovery**: `bounded` or `loop-until-dry` (for unknown-size find tasks)
+
+Pick `parallel` only when the runtime supports it AND there are ≥2 independent,
+non-conflicting, high-value strategies. Otherwise stay sequential — the default is
+always safe. Write a one-line rationale so the choice is auditable from state.
+
+### E. EXECUTE — ONE Coherent Improvement
+
+Each iteration produces ONE coherent improvement. In `sequential` mode that is one
+focused change. In `parallel` mode it is the **best of N candidate changes** from a
+fan-out round (§ Parallel Rounds) — still one improvement accepted per iteration, just
+explored in parallel first. Never batch unrelated changes into a single accepted result.
+
+**Sequential change** — do the one thing well:
 
 - **Structural refactoring** → use an available refactoring agent, or do the focused change directly
 - **Clarity/polish** → use an available simplification/review agent, or do the focused change directly
@@ -207,6 +307,10 @@ Each iteration does ONE thing well:
 - **UI quality** → run registered quality commands on changed files, or fix the top-scoring checklist failure (see § UI Quality Gate)
 - **Simplification** → delete dead code, reduce abstractions, flatten indirection
 
+**Parallel round** — when `iteration_plan.mode == parallel`, fan out K agents (one per
+dimension/strategy) in isolation, then fan in to a single accepted improvement
+(§ Parallel Rounds). Each candidate is a complete, independently-verifiable change.
+
 Use fresh-context agents when they are available and helpful; otherwise keep the change focused and do it directly.
 
 ### F. VERIFY — Tests Must Be Green
@@ -215,7 +319,13 @@ Run tests — **must be green** before proceeding.
 If red: debug and fix within this iteration. Do NOT proceed to RECORD with failures.
 Re-measure with coverage to capture post-change KPIs.
 
-**UI quality gate** (when `ui_task: true`): After tests pass, run the UI quality check per § UI Quality Gate. Record the resulting `ui_quality_score`. A score below 50 is a critical failure — fix before RECORD, same as red tests.
+**Verify at the planned depth** (`iteration_plan.verify_depth`, § Verification Depth):
+green tests are the floor, not the ceiling. A risky or surprising change earns deeper
+scrutiny — escalate to an adversarial pass that tries to *refute* the improvement and
+its KPI claim before you accept it. If the refutation lands, treat it like a red test:
+fix or revert before RECORD. Never let a fabricated or fragile "green" through.
+
+**UI/UX quality gate** (when `ui_task: true`): After tests pass, run the UI quality check per § UI Quality Gate. Record the resulting `ui_quality_score`. A score below 50 is a critical failure — fix before RECORD, same as red tests. For interaction/flow changes, also verify the UX path end-to-end (the change does what a user needs, not just that it renders).
 
 ### G. RECORD — Update Forge State (THE Autoregressive Step)
 
@@ -261,6 +371,13 @@ Update the Forge state file for the current driver (using your session ID `{sid}
    - Fall back: append under `## Lessons` in `AGENT.md`
    - Write only facts useful to any future agent, not forge-process observations (those stay in forge-state)
 
+8. **Compact state if long** — keep the autoregressive memory lean for long runs (§ State Compaction):
+   - When the iteration log exceeds ~25 entries (or the file grows unwieldy), archive the
+     oldest entries to `forge-state.{sid}.archive.md` and replace them with a short rollup
+   - NEVER compact away: baseline, targets, success contract, `capabilities`, current
+     `strategies_tried` deltas, open `ideas`, or lessons still in play. Compaction is
+     lossless for decisions — it only sheds verbose per-iteration narration.
+
 ### H. COMPLETE — All Targets Met?
 
 Check ALL conditions simultaneously:
@@ -276,7 +393,13 @@ If ALL met:
 - Commit: `forge(complete): [task summary]` including the changelog update
 - Output `FORGE_COMPLETE` on its own line
 
-If not → exit normally (stop hook re-injects prompt for next iteration)
+If not met, also stop (gracefully, not as success) when a convergence or budget
+condition trips (§ Convergence and Stopping) — no-progress across rounds, a token/cost
+ceiling, or detected goal drift. On such a stop, record *why* and what remains, then
+output `FORGE_COMPLETE` with an honest summary (do not claim targets were met if they
+were not).
+
+Otherwise → exit normally (stop hook re-injects prompt for next iteration)
 
 ## Stagnation Protocol
 
@@ -299,6 +422,97 @@ When stagnation triggers (or when you run out of ideas within a strategy):
 4. **Try the inverse** — if adding X didn't help, try removing it (or vice versa)
 5. **Think harder** — don't stop and ask. Read related code, look for patterns, try more radical changes
 6. **Simplification pass** — can you delete code and maintain the same KPIs? That's a win
+
+## Parallel Rounds
+
+A parallel round explores several improvements at once, then accepts the single best —
+the `Round N · K agents` view from the screenshot. It is an *opt-in acceleration* of a
+sequential iteration, chosen adaptively in DECIDE, never a change to the keep-one
+discipline. Requires `parallel_agents`; without it, fall back to trying candidates
+sequentially.
+
+### Fan-out
+
+1. Pick K independent dimensions/strategies (e.g. `data-integrity`, `test-trust`,
+   `strategy-security`, `coverage-push`). Each must be able to succeed without
+   conflicting with the others.
+2. Spawn one agent per dimension, **each in worktree isolation** if `worktree_isolation`
+   is available (so concurrent edits never collide). Label them `rN:dimension` for legibility.
+3. Each agent produces a complete, self-contained candidate change and runs tests on it.
+   Agents that go red or empty-handed simply drop out of the round.
+
+### Fan-in (judge-panel keep/discard)
+
+4. Collect the surviving candidates. Apply binary keep/discard discipline (Karpathy):
+   - **0 survivors** → nothing accepted this round; record the dry round and re-plan.
+   - **1 survivor** → verify it at the planned depth, then accept.
+   - **2+ survivors** → run a **judge panel**: score each candidate on the round's KPIs
+     plus the Simplicity Criterion (a smaller/simpler diff at equal gain wins). Use
+     `fresh_context_eval` judges if available; prefer an odd number and majority verdict.
+     Keep the winner; **discard the rest cleanly** (drop their worktrees).
+5. The accepted candidate then goes through F. VERIFY exactly like a sequential change.
+   Only the winner is merged to the working tree and committed.
+
+Graft, don't hoard: if a discarded candidate contained a clearly better sub-idea, note it
+in `ideas` for a future iteration rather than merging two diffs at once.
+
+## Verification Depth
+
+Green tests are necessary, not sufficient. Forge scales scrutiny to the change's risk so
+it spends verification effort where it pays off (chosen in DECIDE, applied in VERIFY).
+
+**Risk score** (informal, per change): blast radius (files/LOC) · criticality (auth, data,
+money, migrations, public API, deletion) · KPI surprise (a delta too good to be true) ·
+reversibility (hard-to-undo > easy).
+
+| Depth | When | What runs |
+|-------|------|-----------|
+| `light` | Trivial, low blast radius, expected KPI move | Tests + a quick self-review checklist |
+| `review` | Moderate change or first touch of a module | One `fresh_context_eval` reviewer over the diff |
+| `adversarial` | High/critical change, or KPI delta that looks too good | 1–N independent skeptics prompted to **refute** the change and the KPI claim — "find how this is wrong, break it, prove the metric is fake." Majority-refute ⇒ reject like a red test |
+| `panel` | Competing candidates (parallel round fan-in) | Judge panel scores + keeps best (§ Parallel Rounds) |
+
+Adversarial verification is the antidote to fake-green: a change that games coverage,
+weakens an assertion, or posts an implausible speedup should be *attacked* before it is
+trusted. Default skeptics to "refuted unless clearly sound." If the capability is absent,
+fall back to a structured self-refutation checklist — still ask "how is this wrong?"
+before accepting.
+
+UI/UX changes verify on their own axis (§ UI Quality Gate) in addition to the above.
+
+## Convergence and Stopping
+
+Forge stops on success (H. COMPLETE) — but a loop that cannot reach success must still
+end gracefully rather than burn forever. Track these alongside the success contract:
+
+- **No-progress / loop-until-dry** — for bounded improvement, the existing stagnation
+  counter rotates strategy at 3 low-delta iterations. For discovery tasks, run finders
+  until **K consecutive dry rounds** (default 2) return nothing new, then stop — don't
+  guess a fixed iteration count. A parallel round that yields 0 survivors counts as dry.
+- **Budget ceiling** — respect any token/cost/time cap the runtime or user sets. When the
+  remaining budget can't fund another useful round, stop and summarize what was achieved
+  and what remains. Never blow a hard ceiling chasing the last KPI point.
+- **Goal drift** — each iteration, re-check that the work still serves the success
+  contract. If recent iterations have wandered into unrelated polish, stop and flag the
+  drift rather than continuing to optimize the wrong thing.
+
+On any of these, output `FORGE_COMPLETE` with an honest status — "converged short of
+target X; remaining work: Y" — never a false claim of completion.
+
+## State Compaction
+
+forge-state is the autoregressive memory and must survive long runs without bloating.
+When the iteration log grows past ~25 entries (or the file becomes unwieldy):
+
+1. Move the oldest narrative entries to `forge-state.{sid}.archive.md`.
+2. Replace them in-place with a 2–3 line rollup: net KPI movement, strategies exhausted,
+   and any still-relevant lesson.
+3. Keep verbatim in the live file: frontmatter (baseline, targets, success contract,
+   `capabilities`, `iteration_plan`), current `strategies_tried` deltas, open `ideas`,
+   and lessons that still guide decisions.
+
+Compaction is lossless for *decisions* — only verbose per-iteration narration is shed.
+If you cannot tell whether a fact still matters, keep it.
 
 ## UI Quality Gate
 
@@ -387,6 +601,19 @@ targets:
   max_iterations: 20
   ui_quality_threshold: 80    # applies when ui_task: true (configurable in AGENT.md)
 ui_task: false                # set true in ORIENT if UI signals detected
+capabilities:                 # detected in ORIENT (§ Runtime Capabilities)
+  fresh_context_eval: true
+  parallel_agents: true
+  worktree_isolation: true
+  workflow_orchestration: true
+  ui_quality_tools: false
+iteration_plan:               # set in DECIDE each iteration (§ Adaptive Orchestration)
+  mode: "sequential"          # sequential | parallel
+  parallel_dimensions: []     # e.g. ["data-integrity", "test-trust"] when mode: parallel
+  verify_depth: "review"      # light | review | adversarial | panel
+  discovery: "bounded"        # bounded | loop-until-dry
+  rationale: "single dominant coverage gap; review depth (moderate blast radius)"
+dry_rounds: 0                 # consecutive rounds that yielded nothing (loop-until-dry)
 current_strategy: "coverage-push"
 stagnation_count: 0
 strategies_tried:
@@ -421,7 +648,7 @@ ideas:
 
 ## Critical Rules
 
-1. **ONE change per iteration** — resist the urge to batch. Small steps compound.
+1. **ONE coherent improvement per iteration** — resist the urge to batch. In parallel mode you may *explore* N candidates, but you accept exactly one. Small steps compound.
 2. **Never skip VERIFY** — red tests mean the iteration failed. Fix before RECORD.
 3. **Never fabricate KPIs** — always parse from actual test runner output.
 4. **Fresh-context evaluation** — use an available isolated reviewer/audit pass to avoid anchoring bias.
@@ -432,6 +659,8 @@ ideas:
 9. **Clean revert on failure** — restore clean state before the next iteration. Never leave dirty files.
 10. **Never stop to ask** — if stuck, think harder. Re-read code, review backlog, combine near-misses, try the inverse.
 11. **Task success comes first** — KPIs are guardrails, not a substitute for actually finishing the requested work.
+12. **Use what the runtime gives you** — detect capabilities, prefer parallel/worktree/judge-panel power when present, degrade gracefully when absent. The sequential default is always correct.
+13. **Verify proportionate to risk** — cheap checks for cheap changes; adversarial refutation for risky ones or suspiciously good KPIs. Never trust a green you did not try to break.
 
 ## Support posture
 

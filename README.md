@@ -21,7 +21,7 @@
 **A task loop with KPI guardrails for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex/manual workflows.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.6.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.7.0-green.svg)](CHANGELOG.md)
 
 Forge is a protocol plus adapters. It takes open-text software tasks, keeps coverage/speed/quality as guardrails, records state across iterations, and runs until the work is honestly done or you stop it.
 
@@ -120,14 +120,14 @@ Each iteration executes one complete eight-phase cycle:
 
 | Phase | What happens |
 |-------|-------------|
-| **A. Orient** | Read forge-state file, check task success contract + KPI trends + stagnation count |
+| **A. Orient** | Read forge-state file, check task success contract + KPI trends + stagnation count; on iteration 1, detect runtime capabilities |
 | **B. Measure** | Run tests with coverage, capture KPIs |
 | **C. Evaluate** | Every 3rd iteration: spawn fresh-context subagent for unbiased audit |
-| **D. Decide** | Pick strategy from KPI gaps + findings + lessons |
-| **E. Execute** | Apply ONE focused transformation |
-| **F. Verify** | Tests must be green, re-measure KPIs |
-| **G. Record** | Update forge-state with deltas + lessons (the autoregressive step) |
-| **H. Complete** | Task success contract satisfied and KPI targets met? Done. Otherwise, next iteration. |
+| **D. Decide** | Pick strategy **and plan the iteration** — sequential vs. parallel fan-out, and how hard to verify |
+| **E. Execute** | Apply ONE coherent improvement (a focused change, or the best of a parallel round) |
+| **F. Verify** | Tests must be green; verify at the planned depth (up to adversarial refutation); re-measure KPIs |
+| **G. Record** | Update forge-state with deltas + lessons (the autoregressive step); compact if long |
+| **H. Complete** | Task success contract + KPI targets met, or a convergence/budget stop reached? Done. Otherwise, next iteration. |
 
 ### Success Contract
 
@@ -161,6 +161,29 @@ When coverage improves by less than 0.1% for two consecutive iterations, forge i
 ### Fresh-Context Evaluation
 
 Every 3rd iteration, Forge runs a fresh-context audit pass. In Claude Code this is typically a subagent; in other environments it may be an isolated reviewer or manual second pass. The protocol requires fresh context, not a specific vendor primitive.
+
+### Capability-Aware, Adaptive
+
+Forge is single-agent and sequential **by default** — it always works that way. But the protocol describes its powers *abstractly* and each driver maps them to whatever the host actually provides. On the first iteration Forge **detects** what the runtime exposes, then adapts.
+
+| Capability | Claude Code | Codex | Protocol-only |
+|------------|:-----------:|:-----:|:-------------:|
+| Fresh-context eval | ✅ | ✅ | ⚪ self-review |
+| Parallel sub-agents | ✅ | 🔸 limited | ⚪ |
+| Worktree isolation | ✅ | 🔸 manual | ⚪ |
+| Workflow orchestration | ✅ | ⚪ | ⚪ |
+| UI quality tools | ✅ if installed | 🔸 | ⚪ checklist |
+
+✅ first-class · 🔸 partial/manual · ⚪ sequential fallback
+
+Each iteration, Forge plans **how** to run, proportionate to opportunity and risk:
+
+- **Parallel rounds** — when several independent, high-value strategies exist and the runtime supports it, Forge fans out one worktree-isolated agent per dimension (`Round N · K agents`), then a judge panel keeps only the best change. One coherent improvement is still accepted per iteration.
+- **Verification depth** — green tests are the floor. Trivial changes get a light self-review; risky or suspiciously-good ones get an **adversarial pass** that tries to refute the change and its KPI claim before it is trusted. No fake-green.
+- **Convergence & stopping** — beyond KPI targets, Forge stops gracefully on no-progress (loop-until-dry), a token/cost budget ceiling, or detected goal drift — always with an honest summary, never a false claim of completion.
+- **State compaction** — long runs stay lean: old narration is archived while decisions, lessons, and the success contract are preserved.
+
+Every capability has a fallback. Nothing in the protocol *requires* parallelism, worktrees, or any specific tool — absent a capability, Forge degrades to its sequential equivalent and still converges.
 
 ---
 

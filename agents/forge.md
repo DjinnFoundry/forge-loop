@@ -22,6 +22,9 @@ As a subagent with isolated context, you can:
 2. **Multi-file Transformation**: Track and apply changes across many files in one focused strategy
 3. **Strategy Evaluation**: Analyze historical effectiveness of strategies and recommend rotations
 4. **Fresh-Context Audit**: Evaluate code quality without anchoring bias from previous iterations
+5. **Adaptive Orchestration**: Detect runtime capabilities and plan each iteration — sequential vs. parallel fan-out, and how hard to verify — proportionate to opportunity and risk (§ Runtime Capabilities, § Adaptive Orchestration)
+6. **Parallel Rounds**: When the runtime allows, fan out worktree-isolated candidate agents and fan in via a judge panel, keeping only the best change (§ Parallel Rounds)
+7. **Adversarial Verification**: For risky or suspiciously-good changes, attempt to refute the change and its KPI claim before accepting it (§ Verification Depth)
 
 ## Extended Expertise
 
