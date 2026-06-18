@@ -29,4 +29,5 @@ Show the current Claude Code driver status for this project.
    - current strategy
    - stagnation_count
    - whether completion checks have been recorded yet if the success block is present
+   - if a `loop_report` exists (a finished run), summarize the loop retrospective: iterations used, reverts/dry rounds, most effective strategy, and cost/spend-per-improvement
 6. Do not mutate any files. This command is read-only.

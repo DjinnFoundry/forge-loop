@@ -21,7 +21,7 @@
 **A task loop with KPI guardrails for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex/manual workflows.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.8.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.9.0-green.svg)](CHANGELOG.md)
 
 Forge is a protocol plus adapters. It takes open-text software tasks, keeps coverage/speed/quality as guardrails, records state across iterations, and runs until the work is honestly done or you stop it.
 
@@ -188,6 +188,7 @@ Each iteration, Forge plans **how** to run, proportionate to opportunity and ris
 - **Convergence & stopping** — beyond KPI targets, Forge stops gracefully on no-progress (loop-until-dry), a token/cost budget ceiling (informed by per-iteration telemetry), or detected goal drift — always with an honest summary, never a false claim of completion.
 - **Blast-radius guard** — unattended runs stay within scope and never take destructive or irreversible git/FS/external actions; they pause for confirmation instead.
 - **Cross-session lessons & state compaction** — durable lessons are pulled forward just-in-time on future runs, and long runs stay lean as old narration is archived while decisions, lessons, and the success contract are preserved.
+- **Loop retrospective** — at the end of a run Forge scores *its own loop* (strategy effectiveness, wasted iterations, verification calibration, cost) and writes loop-level lessons to the ledger, so the next run starts smarter. The loop itself is a target of improvement, not just the code under it.
 
 Every capability has a fallback. Nothing in the protocol *requires* parallelism, worktrees, or any specific tool — absent a capability, Forge degrades to its sequential equivalent and still converges.
 

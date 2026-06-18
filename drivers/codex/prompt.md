@@ -13,9 +13,9 @@ D. DECIDE - Pick strategy + plan the iteration (mode + verify_depth) from KPI ga
 E. EXECUTE - ONE coherent improvement
 F. VERIFY - Tests must be green; verify at the planned depth (escalate to adversarial refutation for risky/surprising changes); re-measure with coverage
 G. RECORD - Update forge-state with deltas + lessons; compact the log if it grows long
-H. COMPLETE - Task success contract satisfied AND KPI targets met (or a convergence/budget stop reached)? output FORGE_COMPLETE on its own line
+H. COMPLETE - Task success contract satisfied AND KPI targets met (or a convergence/budget stop reached)? Write a loop retrospective, then output FORGE_COMPLETE on its own line
 
-NOTE: Codex runs sequentially by default. Use subagents/`git worktree` for parallel rounds only if available; otherwise try candidate strategies one at a time. Refer to the forge skill for the full protocol (§ Runtime Capabilities, § Adaptive Orchestration, § Parallel Rounds, § Verification Depth, § No-Cheat Invariant, § Convergence and Stopping, § Blast-Radius Guard).
+NOTE: Codex runs sequentially by default. Use subagents/`git worktree` for parallel rounds only if available; otherwise try candidate strategies one at a time. Refer to the forge skill for the full protocol (§ Runtime Capabilities, § Adaptive Orchestration, § Parallel Rounds, § Verification Depth, § No-Cheat Invariant, § Convergence and Stopping, § Blast-Radius Guard, § Loop Retrospective).
 
 CRITICAL: Do NOT skip steps. Accept ONE coherent improvement per iteration (you may explore candidates, but keep only the best).
 CRITICAL: Parse KPIs from actual test output. Never fabricate numbers. Verify proportionate to risk — never trust a green you did not try to break.

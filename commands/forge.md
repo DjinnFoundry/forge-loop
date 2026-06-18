@@ -60,9 +60,9 @@ D. DECIDE - Pick strategy + plan the iteration (mode: sequential|parallel, verif
 E. EXECUTE - ONE coherent improvement: a focused change, or the best of a parallel fan-out round (worktree-isolated, cheap-tier workers + strong-tier judge panel) when parallel is warranted
 F. VERIFY - Tests must be green; verify at the planned depth (escalate to adversarial refutation for risky/surprising changes); re-measure with coverage
 G. RECORD - Update forge-state with deltas + lessons (autoregressive step); compact the log if it grows long
-H. COMPLETE - Task success contract satisfied AND KPI targets met (or convergence/budget stop reached)? → output FORGE_COMPLETE on its own line
+H. COMPLETE - Task success contract satisfied AND KPI targets met (or convergence/budget stop reached)? Write a loop retrospective, then output FORGE_COMPLETE on its own line
 
-Refer to the forge skill for the full protocol (§ Runtime Capabilities, § Model Tiering, § Adaptive Orchestration, § Parallel Rounds, § Verification Depth, § No-Cheat Invariant, § Convergence and Stopping, § Blast-Radius Guard).
+Refer to the forge skill for the full protocol (§ Runtime Capabilities, § Model Tiering, § Adaptive Orchestration, § Parallel Rounds, § Verification Depth, § No-Cheat Invariant, § Convergence and Stopping, § Blast-Radius Guard, § Loop Retrospective).
 
 CRITICAL: Do NOT skip steps. Accept ONE coherent improvement per iteration (explore candidates in parallel if you like, but keep only the best).
 CRITICAL: Use the runtime's capabilities when present; degrade gracefully when absent. Sequential is always a safe default.

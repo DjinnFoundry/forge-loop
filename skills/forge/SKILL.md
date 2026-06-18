@@ -429,6 +429,9 @@ were not).
 
 Otherwise → exit normally (stop hook re-injects prompt for next iteration)
 
+**Before any `FORGE_COMPLETE`** — on success OR a graceful stop — write a loop
+retrospective (§ Loop Retrospective) so the next run starts smarter.
+
 **Control markers** (output on their own line, never quoted): `FORGE_COMPLETE` ends the
 loop; `FORGE_PAUSE` suspends it for user input. If the driver was launched with an
 explicit completion promise, the loop ends instead by emitting `<promise>TEXT</promise>`
@@ -442,6 +445,34 @@ dies with the session. The project memory ledger (fallback chain in § G. RECORD
 project-level facts there, and ORIENT pulls the relevant ones forward JIT on the first
 iteration of a future run (§ A. ORIENT). This closes the loop so lessons compound across
 sessions instead of being trapped in one transcript.
+
+## Loop Retrospective
+
+Forge improves the code every iteration; the retrospective is where it improves *the loop
+itself* — the part most autonomous-loop tooling never measures. It runs once, at the end
+of a run (before any `FORGE_COMPLETE`, success or graceful stop), entirely from data
+already in forge-state — no extra test runs.
+
+Score the run, not the code:
+
+- **Efficiency** — iterations used vs. `max_iterations`; iterations-to-first-improvement;
+  count of reverted iterations and dry rounds (wasted motion).
+- **Strategy effectiveness** — from `strategies_tried` deltas: which strategy delivered the
+  most KPI movement per iteration, and which underperformed or stagnated.
+- **Verification calibration** — did `adversarial`/`panel` depths catch real problems, or
+  were they spent on changes that were fine? Were any fake-greens caught
+  (§ No-Cheat Invariant)? Under- or over-verified?
+- **Cost** — total `telemetry` spend and spend-per-accepted-improvement; whether a budget
+  stop was hit (§ Convergence and Stopping).
+
+Then distill **1–2 loop-level lessons** — about *how to run the loop better next time*
+(strategy ordering, when to go parallel, depth calibration, where tokens were wasted), as
+distinct from code-level lessons. Persist them to the project ledger (§ Lessons Memory) so
+the next run's ORIENT pulls them forward and DECIDE starts smarter. Record a short
+`loop_report` rollup in forge-state for `/forge-status` to surface.
+
+This is the autoregressive step applied to Forge's own behavior: the loop is a target of
+improvement, not just the code under it.
 
 ## Stagnation Protocol
 
@@ -742,6 +773,7 @@ telemetry:                    # cumulative rollup, updated each RECORD (§ G. RE
   tokens_spent: 0
   cost_spent: 0
   wall_seconds: 0
+loop_report: null             # written once at the end (§ Loop Retrospective); e.g. {iterations: 7, reverts: 1, best_strategy: "coverage-push", spend_per_win: "12k tok", lessons: ["..."]}
 current_strategy: "coverage-push"
 stagnation_count: 0
 strategies_tried:

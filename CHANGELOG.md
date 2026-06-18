@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-06-18
+
+### Added
+- **Loop Retrospective** — at the end of a run (on success or a graceful stop), Forge scores *its own loop* from data already in state: strategy effectiveness, iterations-to-first-improvement, reverts and dry rounds, verification calibration, and cost per accepted improvement. It distills loop-level lessons (how to run the loop better next time) to the project ledger so the next run's ORIENT/DECIDE start smarter, and records a `loop_report` rollup surfaced by `/forge-status`. The loop itself becomes a target of improvement, not just the code under it.
+- **`tests/docs-integrity.test.sh`** — automated guard for the protocol source of truth: validates the canonical forge-state YAML example parses, every `§` cross-reference resolves to a real section, the abstract and driver capability tables stay in sync, and Critical Rules stay contiguously numbered. Turns the manual reality-check into a permanent regression test.
+
+### Changed
+- `/forge-status` now surfaces the loop retrospective when a finished run has recorded one.
+- CONTRIBUTING lists the new docs-integrity test in the standard test run.
+
 ## [0.8.0] - 2026-06-18
 
 ### Added
