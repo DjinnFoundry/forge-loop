@@ -185,12 +185,34 @@ EOF
   rm -rf "$repo_dir"
 }
 
+# Regression: the installer links scripts into ~/.codex/bin, so they must resolve
+# their own symlink to find lib.sh / prompt.md. Invoking through a symlink (as a real
+# install does) must work, not just running them by their repo path.
+test_scripts_work_through_symlink() {
+  local repo_dir bin_dir
+  repo_dir="$(mktemp -d)"
+  bin_dir="$(mktemp -d)"
+  ln -s "$INIT_PATH" "${bin_dir}/forge-init"
+  ln -s "$STATUS_PATH" "${bin_dir}/forge-status"
+  (
+    cd "$repo_dir"
+    output_init="$("${bin_dir}/forge-init" "symlinked scope" --coverage 90)"
+    assert_contains "$output_init" "Initialized Forge Codex driver session" "forge-init must work when invoked through a symlink (real install path)"
+    session_id="$(printf '%s\n' "$output_init" | awk '/Initialized Forge Codex driver session/ {print $6}' | tr -d '.')"
+    assert_file ".codex/forge/forge-state.${session_id}.md" "symlinked forge-init should create Forge state"
+    output_status="$("${bin_dir}/forge-status" "$session_id")"
+    assert_contains "$output_status" "Session: ${session_id}" "forge-status must work when invoked through a symlink"
+  )
+  rm -rf "$repo_dir" "$bin_dir"
+}
+
 main() {
   test_codex_init_continue_cancel
   test_open_text_success_contract_round_trips
   test_codex_install
   test_multiple_active_sessions_require_explicit_id
   test_status_and_error_paths
+  test_scripts_work_through_symlink
   echo "codex-driver tests passed"
 }
 

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-06-19
+
+### Fixed
+- **Codex driver scripts now resolve their own symlink.** `forge-init`, `forge-continue`, `forge-cancel`, and `forge-status` computed their repo root from `BASH_SOURCE` without following symlinks, so invoking them through the installed `~/.codex/bin/forge-*` links (the normal usage) failed with `lib.sh: No such file or directory`. They now resolve the symlink first (matching the stop hook), so the installed commands work. Added a regression test that invokes a script through a symlink — the gap that let this ship.
+
+### Changed
+- Documented Forge **activation per driver** in SKILL.md (what to run when triggered by "forge it" / `/forge` with no active session): Claude Code via `/forge`, Codex via `forge-init` → `forge-continue`, or any agent following phases A–H directly.
+- Reconciled the documented `session_id` format with the drivers' actual behaviour: `MMDD-HHMM-SUFFIX`, where the suffix is a task slug (Claude) or a random hex token (Codex `forge-init`).
+
 ## [0.9.0] - 2026-06-18
 
 ### Added

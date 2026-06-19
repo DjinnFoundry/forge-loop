@@ -67,6 +67,21 @@ Forge currently ships two first-class drivers:
 Other environments can reuse Forge Core manually, but should not be described as
 officially supported unless they ship a real driver.
 
+### Activation
+
+When Forge is triggered (e.g. "forge it" / "forge this", or the `/forge` command) and no
+session is active yet, start the loop via the current driver:
+
+- **Claude Code** — the `/forge` command runs the launch sequence (parse scope + targets,
+  measure baseline, create state, begin iteration 1); the stop hook re-injects the prompt
+  each iteration.
+- **Codex** — run `forge-init "<scope>" [--coverage N] [--quality strict|moderate|lax] …`
+  to scaffold state and print the iteration-1 prompt; paste it into Codex, then run
+  `forge-continue` after each iteration (`forge-status` / `forge-cancel` manage the session).
+- **Any agent, no driver tooling** — follow phases A–H directly: generate a session ID,
+  create the state file in the documented format (§ Forge State File Format), and iterate.
+  The driver scripts are convenience, not a requirement.
+
 ## Runtime Capabilities
 
 Forge Core is single-agent and sequential by default — it always works that way.
@@ -169,7 +184,7 @@ must be able to defend from the recorded state, not a vibe.
 
 ### A. ORIENT — Read State
 
-**Session ID**: Each forge loop gets a unique session ID: `MMDD-HHMM-SLUG` where MMDD-HHMM is the current timestamp and SLUG is 2-3 words from the task (e.g., `0406-1530-djinnchat-primefix`). Generate this on the first iteration and reuse it every subsequent iteration.
+**Session ID**: Each forge loop gets a unique session ID: `MMDD-HHMM-SUFFIX` where MMDD-HHMM is the current timestamp and SUFFIX is a short unique token — a 2-3 word task slug (Claude driver, e.g. `0406-1530-djinnchat-primefix`) or a random hex token (Codex `forge-init`, e.g. `0406-1530-9f3a`). Generate this on the first iteration and reuse it every subsequent iteration.
 
 State file path (substitute your session ID for `{sid}`):
 
