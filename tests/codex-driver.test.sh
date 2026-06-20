@@ -51,20 +51,20 @@ test_codex_init_continue_cancel() {
     output_init="$("$INIT_PATH" "API controllers" --done-when "reset flow works end-to-end" --coverage 90 --speed -30% --quality strict --max-iterations 5)"
     assert_contains "$output_init" "Initialized Forge Codex driver session" "forge-init should initialize a session"
     session_id="$(printf '%s\n' "$output_init" | awk '/Initialized Forge Codex driver session/ {print $6}' | tr -d '.')"
-    assert_file ".codex/forge/forge-state.${session_id}.md" "forge-init should create Forge state"
-    assert_file ".codex/forge/loop-state.${session_id}.md" "forge-init should create loop state"
-    assert_contains "$(cat ".codex/forge/forge-state.${session_id}.md")" 'done_when: "reset flow works end-to-end"' "forge-init should persist explicit done_when"
+    assert_file ".forge/forge-state.${session_id}.md" "forge-init should create Forge state"
+    assert_file ".forge/loop-state.${session_id}.md" "forge-init should create loop state"
+    assert_contains "$(cat ".forge/forge-state.${session_id}.md")" 'done_when: "reset flow works end-to-end"' "forge-init should persist explicit done_when"
 
     output_continue="$("$CONTINUE_PATH" "$session_id")"
     assert_contains "$output_continue" "iteration 1" "forge-continue should report current iteration before incrementing"
     assert_contains "$output_continue" "DONE WHEN: reset flow works end-to-end" "forge-continue should render explicit done_when into the prompt"
-    next_iteration="$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' ".codex/forge/loop-state.${session_id}.md" | awk -F: '$1=="iteration" { sub(/^[^:]+:[[:space:]]*/, "", $0); print; exit }')"
+    next_iteration="$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' ".forge/loop-state.${session_id}.md" | awk -F: '$1=="iteration" { sub(/^[^:]+:[[:space:]]*/, "", $0); print; exit }')"
     assert_equals "1" "$next_iteration" "forge-continue should align loop state with the next required recorded iteration"
 
     output_continue_repeat="$("$CONTINUE_PATH" "$session_id")"
     assert_contains "$output_continue_repeat" "iteration 1" "forge-continue should not silently drift iterations when forge-state has not advanced"
 
-    cat >> ".codex/forge/forge-state.${session_id}.md" <<'EOF'
+    cat >> ".forge/forge-state.${session_id}.md" <<'EOF'
 
 ## Iteration 1 - coverage-push
 - Coverage: 80.0 -> 80.8 (+0.8%)
@@ -75,8 +75,8 @@ EOF
 
     output_cancel="$("$CANCEL_PATH" "$session_id")"
     assert_contains "$output_cancel" "Cancelled Forge Codex driver session ${session_id}." "forge-cancel should cancel the session"
-    [[ ! -f ".codex/forge/loop-state.${session_id}.md" ]] || fail "forge-cancel should remove loop state"
-    assert_file ".codex/forge/forge-state.${session_id}.md" "forge-cancel should preserve Forge state"
+    [[ ! -f ".forge/loop-state.${session_id}.md" ]] || fail "forge-cancel should remove loop state"
+    assert_file ".forge/forge-state.${session_id}.md" "forge-cancel should preserve Forge state"
   )
   rm -rf "$repo_dir"
 }
@@ -91,7 +91,7 @@ test_open_text_success_contract_round_trips() {
 
     output_init="$("$INIT_PATH" "$scope" --done-when "$done_when")"
     session_id="$(printf '%s\n' "$output_init" | awk '/Initialized Forge Codex driver session/ {print $6}' | tr -d '.')"
-    forge_state_path=".codex/forge/forge-state.${session_id}.md"
+    forge_state_path=".forge/forge-state.${session_id}.md"
 
     assert_contains "$(cat "$forge_state_path")" 'scope: "Ship \"forgot password\" / email fallback"' "forge-init should YAML-escape open text scope"
     assert_contains "$(cat "$forge_state_path")" 'done_when: "users can finish \"forgot password\" & email fallback end-to-end"' "forge-init should YAML-escape explicit done_when"
@@ -164,16 +164,16 @@ test_status_and_error_paths() {
     assert_contains "$output_status" "Next iteration: 1" "forge-status should report the next required iteration"
     assert_contains "$output_status" "Success mode: task-derived" "forge-status should report task-derived success mode when no override is provided"
 
-    sed -i.bak 's/^max_iterations: .*/max_iterations: nope/' ".codex/forge/loop-state.${session_id}.md"
-    rm -f ".codex/forge/loop-state.${session_id}.md.bak"
+    sed -i.bak 's/^max_iterations: .*/max_iterations: nope/' ".forge/loop-state.${session_id}.md"
+    rm -f ".forge/loop-state.${session_id}.md.bak"
     if "$CONTINUE_PATH" "$session_id" >/tmp/forge-invalid.out 2>/tmp/forge-invalid.err; then
       fail "forge-continue should fail on invalid max_iterations metadata"
     fi
     assert_contains "$(cat /tmp/forge-invalid.err)" "invalid iteration metadata" "forge-continue should report invalid iteration metadata"
 
-    sed -i.bak 's/^max_iterations: .*/max_iterations: 1/' ".codex/forge/loop-state.${session_id}.md"
-    rm -f ".codex/forge/loop-state.${session_id}.md.bak"
-    cat >> ".codex/forge/forge-state.${session_id}.md" <<'EOF'
+    sed -i.bak 's/^max_iterations: .*/max_iterations: 1/' ".forge/loop-state.${session_id}.md"
+    rm -f ".forge/loop-state.${session_id}.md.bak"
+    cat >> ".forge/forge-state.${session_id}.md" <<'EOF'
 
 ## Iteration 1 - done
 - Coverage: 80.0 -> 81.0 (+1.0%)
@@ -201,7 +201,7 @@ test_scripts_work_through_symlink() {
     output_init="$("${bin_dir}/forge-init" "symlinked scope" --coverage 90)"
     assert_contains "$output_init" "Initialized Forge Codex driver session" "forge-init must work when invoked through a symlink (real install path)"
     session_id="$(printf '%s\n' "$output_init" | awk '/Initialized Forge Codex driver session/ {print $6}' | tr -d '.')"
-    assert_file ".codex/forge/forge-state.${session_id}.md" "symlinked forge-init should create Forge state"
+    assert_file ".forge/forge-state.${session_id}.md" "symlinked forge-init should create Forge state"
     output_status="$("${bin_dir}/forge-status" "$session_id")"
     assert_contains "$output_status" "Session: ${session_id}" "forge-status must work when invoked through a symlink"
   )
@@ -220,7 +220,7 @@ test_forge_run_autoiterates_until_complete() {
 # Mock `codex exec`: simulate one Forge iteration by recording it in forge-state,
 # and signal completion on the second iteration.
 shift || true   # drop the `exec` subcommand; ignore flags + prompt
-state="$(ls .codex/forge/forge-state.*.md 2>/dev/null | head -1)"
+state="$(ls .forge/forge-state.*.md 2>/dev/null | head -1)"
 [[ -n "$state" ]] || { echo "mock: no forge-state found" >&2; exit 1; }
 n=$(( $(grep -c '^## Iteration ' "$state") + 1 ))
 printf '\n## Iteration %d - mock\n- Coverage: +1.0%%\n' "$n" >> "$state"
@@ -232,10 +232,10 @@ MOCK
     cd "$repo_dir"
     output="$(FORGE_CODEX_BIN="${bin_dir}/codex" FORGE_CODEX_ARGS=" " "$RUN_PATH" "autonomous scope" --max-iterations 5)"
     assert_contains "$output" "FORGE_COMPLETE — session" "forge-run should stop on FORGE_COMPLETE"
-    state_file="$(ls .codex/forge/forge-state.*.md | head -1)"
+    state_file="$(ls .forge/forge-state.*.md | head -1)"
     iteration_count="$(grep -c '^## Iteration ' "$state_file" || true)"
     assert_equals "2" "$iteration_count" "forge-run should iterate until the completion marker (2 mock iterations)"
-    loop_file="$(ls .codex/forge/loop-state.*.md | head -1)"
+    loop_file="$(ls .forge/loop-state.*.md | head -1)"
     assert_contains "$(grep '^active:' "$loop_file")" "false" "forge-run should deactivate loop state when the run ends"
   )
   rm -rf "$repo_dir" "$bin_dir"
@@ -258,7 +258,7 @@ MOCK
     output="$(FORGE_CODEX_BIN="${bin_dir}/codex" FORGE_CODEX_ARGS=" " "$RUN_PATH" "stall scope" --max-iterations 9 2>&1)"
     assert_contains "$output" "no progress" "forge-run should detect a stall"
     assert_contains "$output" "without a completion marker" "forge-run should report it stopped without completing"
-    state_file="$(ls .codex/forge/forge-state.*.md | head -1)"
+    state_file="$(ls .forge/forge-state.*.md | head -1)"
     iteration_count="$(grep -c '^## Iteration ' "$state_file" || true)"
     assert_equals "0" "$iteration_count" "forge-run should not fabricate iterations on a stall"
   )

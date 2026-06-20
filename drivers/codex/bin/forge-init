@@ -102,7 +102,7 @@ if [[ ! "$max_iterations" =~ ^[0-9]+$ ]]; then
 fi
 
 project_root="$(pwd)"
-state_dir="${project_root}/.codex/forge"
+state_dir="${project_root}/.forge"
 mkdir -p "$state_dir"
 
 timestamp="$(date -u +"%m%d-%H%M")"
@@ -124,7 +124,7 @@ cat > "$forge_state" <<EOF
 session_id: "${session_id}"
 scope: ${scope_yaml}
 driver: "codex"
-state_root: ".codex/forge"
+state_root: ".forge"
 success:
   mode: "${success_mode}"
   task: ${scope_yaml}
@@ -164,7 +164,7 @@ iteration: 1
 last_prompted_iteration: 0
 max_iterations: ${max_iterations}
 driver: "codex"
-state_file: ".codex/forge/forge-state.${session_id}.md"
+state_file: ".forge/forge-state.${session_id}.md"
 started_at: "${started_at}"
 ---
 EOF
@@ -173,8 +173,8 @@ done_when_text="${done_when:-Derive concrete completion checks from the task sco
 prompt_text="$(forge_render_prompt "$PROMPT_TEMPLATE" "$session_id" "$scope" "1" "$done_when_text")"
 
 echo "Initialized Forge Codex driver session ${session_id}."
-echo "Forge state: .codex/forge/forge-state.${session_id}.md"
-echo "Loop state: .codex/forge/loop-state.${session_id}.md"
+echo "Forge state: .forge/forge-state.${session_id}.md"
+echo "Loop state: .forge/loop-state.${session_id}.md"
 echo ""
 echo "Paste this into Codex for iteration 1:"
 echo ""

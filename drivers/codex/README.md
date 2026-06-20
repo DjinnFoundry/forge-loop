@@ -17,7 +17,7 @@ forge-run "scope" --done-when "what finished means" --coverage 90
 ```
 
 `forge-run` scaffolds the session, then runs one `codex exec` per iteration (fresh
-context each round; state in `.codex/forge/`) until the agent emits `FORGE_COMPLETE`, an
+context each round; state in `.forge/`) until the agent emits `FORGE_COMPLETE`, an
 iteration records no progress (stall guard), or max-iterations is reached. It defaults to
 `codex exec -c approval_policy=never -c sandbox_mode=workspace-write` so it never blocks on
 approval prompts.
@@ -49,10 +49,10 @@ Resume an interrupted run with `forge-run --session SESSION_ID`.
 
 ## State layout
 
-The Codex driver stores state under `.codex/forge/` in the target project:
+The Codex driver stores state under `.forge/` in the target project:
 
-- `.codex/forge/forge-state.SESSION.md` — Forge Core KPI/state file
-- `.codex/forge/loop-state.SESSION.md` — Codex driver loop metadata
+- `.forge/forge-state.SESSION.md` — Forge Core KPI/state file
+- `.forge/loop-state.SESSION.md` — Codex driver loop metadata
 
 The Forge state format stays compatible with Forge Core. Only the driver state
 location differs from the Claude Code adapter.

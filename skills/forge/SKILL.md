@@ -191,7 +191,7 @@ must be able to defend from the recorded state, not a vibe.
 State file path (substitute your session ID for `{sid}`):
 
 - Claude Code: `.claude/forge-state.{sid}.md`
-- Codex: `.codex/forge/forge-state.{sid}.md`
+- Codex: `.forge/forge-state.{sid}.md`
 
 **On first iteration**: no state file exists yet. Generate the session ID, proceed to MEASURE, and create the state file during RECORD.
 
@@ -375,7 +375,7 @@ red test.
 Update the Forge state file for the current driver (using your session ID `{sid}`):
 
 - Claude Code: `.claude/forge-state.{sid}.md`
-- Codex: `.codex/forge/forge-state.{sid}.md`
+- Codex: `.forge/forge-state.{sid}.md`
 
 1. **Append iteration entry** with:
    - Iteration number
@@ -734,7 +734,7 @@ ONE fix per iteration. Commit if score improves.
 Driver defaults (substitute your generated session ID for `{sid}`):
 
 - Claude Code: `.claude/forge-state.{sid}.md`
-- Codex: `.codex/forge/forge-state.{sid}.md`
+- Codex: `.forge/forge-state.{sid}.md`
 
 ```yaml
 ---

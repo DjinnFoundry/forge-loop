@@ -1,4 +1,4 @@
-Read .codex/forge/forge-state.{SESSION}.md and follow The Forge Protocol (A through H).
+Read .forge/forge-state.{SESSION}.md and follow The Forge Protocol (A through H).
 
 SCOPE: {SCOPE}
 SESSION: {SESSION}

@@ -21,7 +21,7 @@
 **A task loop with KPI guardrails for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex/manual workflows.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.10.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.10.1-green.svg)](CHANGELOG.md)
 
 Forge is a protocol plus adapters. It takes open-text software tasks, keeps coverage/speed/quality as guardrails, records state across iterations, and runs until the work is honestly done or you stop it.
 
@@ -80,12 +80,12 @@ The bundled Codex adapter in this repo:
 - `drivers/codex/bin/forge-continue`
 - `drivers/codex/bin/forge-cancel`
 - `drivers/codex/bin/forge-status`
-- `.codex/forge/` state layout for per-project sessions
+- `.forge/` state layout for per-project sessions
 - shared shell state helpers reused across drivers
 
 Both drivers are first-class. Claude gets hook-driven iteration inside one session;
 Codex gets `forge-run` for hands-free iteration (a fresh `codex exec` per round, state in
-`.codex/forge/`) plus `forge-init` / `forge-continue` for step-by-step manual control.
+`.forge/`) plus `forge-init` / `forge-continue` for step-by-step manual control.
 
 ## Support Matrix
 
@@ -245,7 +245,7 @@ forge-run "scope" [--done-when "TEXT"] [--coverage N] [--quality strict|moderate
 ```
 
 `forge-run` drives the whole loop: it scaffolds state, then runs one `codex exec` per
-iteration (fresh context each round; state in `.codex/forge/`) until the agent emits
+iteration (fresh context each round; state in `.forge/`) until the agent emits
 `FORGE_COMPLETE`, a no-progress stall is detected, or max-iterations is reached. No
 per-iteration babysitting. By default it runs `codex exec` with
 `-c approval_policy=never -c sandbox_mode=workspace-write` so it never blocks on approval
@@ -324,7 +324,7 @@ Use the same protocol phases and state format, but drive the loop yourself. Toda
 Forge persists its state in driver-specific roots:
 
 - Claude Code: `.claude/forge-state.SESSION.md`
-- Codex: `.codex/forge/forge-state.SESSION.md`
+- Codex: `.forge/forge-state.SESSION.md`
 
 Claude’s loop driver uses `.claude/forge-loop.SESSION.local.md` as the primary
 loop-state file name. Legacy `.claude/ralph-loop.SESSION.local.md` files are

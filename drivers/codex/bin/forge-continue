@@ -12,7 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "$SOURCE_PATH")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 PROMPT_TEMPLATE="${ROOT_DIR}/drivers/codex/prompt.md"
 LIB_PATH="${ROOT_DIR}/drivers/codex/lib.sh"
-STATE_DIR="$(pwd)/.codex/forge"
+STATE_DIR="$(pwd)/.forge"
 
 source "$LIB_PATH"
 
@@ -23,7 +23,7 @@ if [[ "${session_id:-}" == "--help" ]] || [[ "${session_id:-}" == "-h" ]]; then
 fi
 
 if [[ ! -d "$STATE_DIR" ]]; then
-  echo "Error: .codex/forge does not exist in this project." >&2
+  echo "Error: .forge does not exist in this project." >&2
   exit 1
 fi
 
@@ -61,7 +61,7 @@ fi
 prompt_text="$(forge_render_prompt "$PROMPT_TEMPLATE" "$session_id" "$scope" "$iteration" "$done_when_text")"
 
 echo "Forge Codex driver session ${session_id}, iteration ${iteration}."
-echo "Forge state: .codex/forge/forge-state.${session_id}.md"
+echo "Forge state: .forge/forge-state.${session_id}.md"
 echo ""
 echo "Paste this into Codex:"
 echo ""

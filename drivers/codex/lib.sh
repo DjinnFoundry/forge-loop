@@ -44,7 +44,7 @@ forge_choose_session() {
   done < <(forge_active_sessions "$state_dir")
 
   if [[ "${#active_sessions[@]}" -eq 0 ]]; then
-    echo "Error: No active Codex Forge loop found in .codex/forge." >&2
+    echo "Error: No active Codex Forge loop found in .forge." >&2
     return 1
   fi
 
@@ -119,6 +119,6 @@ forge_codex_status() {
   printf 'Last prompted iteration: %s\n' "${last_prompted_iteration:-0}"
   printf 'Next iteration: %s\n' "$next_iteration"
   printf 'Max iterations: %s\n' "$max_iterations"
-  printf 'Forge state: .codex/forge/forge-state.%s.md\n' "$session_id"
-  printf 'Loop state: .codex/forge/loop-state.%s.md\n' "$session_id"
+  printf 'Forge state: .forge/forge-state.%s.md\n' "$session_id"
+  printf 'Loop state: .forge/loop-state.%s.md\n' "$session_id"
 }

@@ -2,7 +2,7 @@
 # forge-run — autonomously drive a Forge loop on Codex.
 #
 # Runs `codex exec` once per iteration (fresh context each time; all state lives in
-# .codex/forge/), re-injecting the Forge prompt until the agent emits FORGE_COMPLETE,
+# .forge/), re-injecting the Forge prompt until the agent emits FORGE_COMPLETE,
 # a no-progress stall is detected, or max-iterations is reached. This is the Ralph
 # loop for Codex: hands-free, no interactive approval prompts.
 set -euo pipefail
@@ -23,7 +23,7 @@ INIT_PATH="${SCRIPT_DIR}/forge-init"
 source "$LIB_PATH"
 
 CODEX_BIN="${FORGE_CODEX_BIN:-codex}"
-STATE_DIR="$(pwd)/.codex/forge"
+STATE_DIR="$(pwd)/.forge"
 
 usage() {
   cat <<'EOF'
@@ -32,7 +32,7 @@ Usage:
   forge-run --session SESSION_ID
 
 Autonomously drives a Forge loop on Codex: one `codex exec` per iteration (fresh
-context, state in .codex/forge/) until FORGE_COMPLETE or max-iterations.
+context, state in .forge/) until FORGE_COMPLETE or max-iterations.
 
 Env:
   FORGE_CODEX_BIN    override the `codex` binary (default: codex; used for testing)
@@ -62,7 +62,7 @@ fi
 forge_state="${STATE_DIR}/forge-state.${session_id}.md"
 loop_state="${STATE_DIR}/loop-state.${session_id}.md"
 if [[ ! -f "$forge_state" ]] || [[ ! -f "$loop_state" ]]; then
-  echo "Error: session ${session_id} is missing state files in .codex/forge." >&2
+  echo "Error: session ${session_id} is missing state files in .forge." >&2
   exit 1
 fi
 
