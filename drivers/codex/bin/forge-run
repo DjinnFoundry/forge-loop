@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# forge-run — autonomously drive a Forge loop on Codex.
+#
+# Runs `codex exec` once per iteration (fresh context each time; all state lives in
+# .codex/forge/), re-injecting the Forge prompt until the agent emits FORGE_COMPLETE,
+# a no-progress stall is detected, or max-iterations is reached. This is the Ralph
+# loop for Codex: hands-free, no interactive approval prompts.
+set -euo pipefail
+
+# Resolve symlinks so the script works when invoked via ~/.codex/bin/forge-run.
+SOURCE_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE_PATH" ]]; do
+  LINK_DIR="$(cd "$(dirname "$SOURCE_PATH")" && pwd)"
+  TARGET_PATH="$(readlink "$SOURCE_PATH")"
+  [[ "$TARGET_PATH" == /* ]] && SOURCE_PATH="$TARGET_PATH" || SOURCE_PATH="${LINK_DIR}/${TARGET_PATH}"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SOURCE_PATH")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+PROMPT_TEMPLATE="${ROOT_DIR}/drivers/codex/prompt.md"
+LIB_PATH="${ROOT_DIR}/drivers/codex/lib.sh"
+INIT_PATH="${SCRIPT_DIR}/forge-init"
+
+source "$LIB_PATH"
+
+CODEX_BIN="${FORGE_CODEX_BIN:-codex}"
+STATE_DIR="$(pwd)/.codex/forge"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  forge-run "SCOPE" [--done-when "TEXT"] [--coverage N] [--speed -N%] [--quality strict|moderate|lax] [--max-iterations N]
+  forge-run --session SESSION_ID
+
+Autonomously drives a Forge loop on Codex: one `codex exec` per iteration (fresh
+context, state in .codex/forge/) until FORGE_COMPLETE or max-iterations.
+
+Env:
+  FORGE_CODEX_BIN    override the `codex` binary (default: codex; used for testing)
+  FORGE_CODEX_ARGS   args passed to `codex exec` (default: -c approval_policy=never -c sandbox_mode=workspace-write)
+EOF
+}
+
+# --- Establish the session --------------------------------------------------
+session_id=""
+if [[ "${1:-}" == "--session" ]]; then
+  session_id="${2:-}"
+  [[ -n "$session_id" ]] || { echo "Error: --session requires an id." >&2; exit 1; }
+elif [[ -z "${1:-}" ]] || [[ "${1:-}" == "-h" ]] || [[ "${1:-}" == "--help" ]]; then
+  usage
+  exit 1
+else
+  # New session: scaffold with forge-init and capture the generated session id.
+  init_out="$("$INIT_PATH" "$@")"
+  session_id="$(printf '%s\n' "$init_out" | awk '/Initialized Forge Codex driver session/ {print $6}' | tr -d '.')"
+  if [[ -z "$session_id" ]]; then
+    echo "Error: could not initialize a Forge session." >&2
+    printf '%s\n' "$init_out" >&2
+    exit 1
+  fi
+fi
+
+forge_state="${STATE_DIR}/forge-state.${session_id}.md"
+loop_state="${STATE_DIR}/loop-state.${session_id}.md"
+if [[ ! -f "$forge_state" ]] || [[ ! -f "$loop_state" ]]; then
+  echo "Error: session ${session_id} is missing state files in .codex/forge." >&2
+  exit 1
+fi
+
+scope="$(forge_strip_quotes "$(forge_frontmatter_value "$forge_state" "scope")")"
+done_when_text="$(forge_done_when_text "$forge_state")"
+max_iterations="$(forge_strip_quotes "$(forge_frontmatter_value "$loop_state" "max_iterations")")"
+[[ "$max_iterations" =~ ^[0-9]+$ ]] || max_iterations=20
+
+# shellcheck disable=SC2206
+codex_args=(${FORGE_CODEX_ARGS:--c approval_policy=never -c sandbox_mode=workspace-write})
+
+has_control_line() {
+  printf '%s\n' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -Fxq "$2"
+}
+
+echo "forge-run: driving session ${session_id} (max ${max_iterations} iterations) via '${CODEX_BIN} exec'"
+
+complete=false
+while :; do
+  recorded="$(forge_recorded_iteration "$forge_state")"
+  next=$((recorded + 1))
+  if (( next > max_iterations )); then
+    echo "forge-run: reached max_iterations (${max_iterations}). Stopping."
+    break
+  fi
+
+  prompt="$(forge_render_prompt "$PROMPT_TEMPLATE" "$session_id" "$scope" "$next" "$done_when_text")"
+  echo "forge-run: --- iteration ${next} ---"
+  if ! out="$("$CODEX_BIN" exec ${codex_args[@]+"${codex_args[@]}"} "$prompt" 2>&1)"; then
+    echo "forge-run: 'codex exec' failed on iteration ${next}." >&2
+    printf '%s\n' "$out" >&2
+    exit 1
+  fi
+  printf '%s\n' "$out"
+
+  if has_control_line "$out" "FORGE_COMPLETE" || has_control_line "$out" "RALPH_COMPLETE"; then
+    complete=true
+    break
+  fi
+
+  # No-progress guard: the iteration must record itself in forge-state.
+  new_recorded="$(forge_recorded_iteration "$forge_state")"
+  if (( new_recorded <= recorded )); then
+    echo "forge-run: iteration ${next} recorded no progress (stall). Stopping to avoid an empty loop." >&2
+    break
+  fi
+done
+
+# Deactivate the loop state — the run is over either way.
+if [[ -f "$loop_state" ]]; then
+  tmp="${loop_state}.tmp.$$"
+  sed 's/^active: .*/active: false/' "$loop_state" > "$tmp" && mv "$tmp" "$loop_state"
+fi
+
+if $complete; then
+  echo "forge-run: FORGE_COMPLETE — session ${session_id} finished in $(forge_recorded_iteration "$forge_state") recorded iteration(s)."
+else
+  echo "forge-run: stopped session ${session_id} without a completion marker (see output above)."
+fi

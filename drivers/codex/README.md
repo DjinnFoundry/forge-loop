@@ -1,10 +1,8 @@
 # Forge Codex Driver
 
-The Codex driver is manual by design.
-
-It reuses Forge Core, but does not depend on Claude Code commands or stop hooks.
-Instead it ships small shell entrypoints that manage loop state and print the
-next prompt to run in Codex.
+The Codex driver reuses Forge Core without depending on Claude Code commands or stop
+hooks. It runs in two modes: **autonomous** (`forge-run`) and **manual**
+(`forge-init` / `forge-continue`).
 
 Forge is task-driven, not just KPI-driven. Each session stores:
 
@@ -12,7 +10,26 @@ Forge is task-driven, not just KPI-driven. Each session stores:
 - either an explicit `--done-when "TEXT"` success contract or a task-derived one
 - the normal KPI guardrails for coverage, speed, quality, and max iterations
 
-Typical flow:
+## Autonomous (hands-free)
+
+```bash
+forge-run "scope" --done-when "what finished means" --coverage 90
+```
+
+`forge-run` scaffolds the session, then runs one `codex exec` per iteration (fresh
+context each round; state in `.codex/forge/`) until the agent emits `FORGE_COMPLETE`, an
+iteration records no progress (stall guard), or max-iterations is reached. It defaults to
+`codex exec -c approval_policy=never -c sandbox_mode=workspace-write` so it never blocks on
+approval prompts.
+
+Environment overrides:
+
+- `FORGE_CODEX_BIN` — path to the `codex` binary (default `codex`; used by the test mock)
+- `FORGE_CODEX_ARGS` — args passed to `codex exec` (default: the two `-c` overrides above)
+
+Resume an interrupted run with `forge-run --session SESSION_ID`.
+
+## Manual (step-by-step)
 
 1. `forge-init "scope" --done-when "what finished means"`
 2. Paste the printed prompt into Codex
@@ -22,6 +39,7 @@ Typical flow:
 
 ## Files
 
+- `bin/forge-run` — drive the loop autonomously via `codex exec`
 - `bin/forge-init` — create a new Forge session for the current project
 - `bin/forge-continue` — print the next iteration prompt for an existing session
 - `bin/forge-cancel` — cancel the active Codex Forge loop without deleting forge-state
@@ -41,6 +59,8 @@ location differs from the Claude Code adapter.
 
 ## Safety notes
 
+- `forge-run` stops on a no-progress stall (an iteration that records no `## Iteration N`
+  entry) and at max-iterations, so an unproductive loop cannot run forever.
 - `forge-continue` derives the next iteration from recorded `## Iteration N`
   entries in Forge state instead of blindly incrementing loop metadata.
 - If multiple active Codex sessions exist, `forge-continue` and `forge-cancel`

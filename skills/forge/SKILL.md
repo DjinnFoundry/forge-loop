@@ -75,9 +75,11 @@ session is active yet, start the loop via the current driver:
 - **Claude Code** — the `/forge` command runs the launch sequence (parse scope + targets,
   measure baseline, create state, begin iteration 1); the stop hook re-injects the prompt
   each iteration.
-- **Codex** — run `forge-init "<scope>" [--coverage N] [--quality strict|moderate|lax] …`
-  to scaffold state and print the iteration-1 prompt; paste it into Codex, then run
-  `forge-continue` after each iteration (`forge-status` / `forge-cancel` manage the session).
+- **Codex** — for a hands-free run, `forge-run "<scope>" [--coverage N] [--quality …] …`
+  drives the loop autonomously (one `codex exec` per iteration, fresh context each time,
+  until FORGE_COMPLETE or max-iterations). For step-by-step control, `forge-init "<scope>" …`
+  scaffolds state and prints the iteration-1 prompt; paste it, then `forge-continue` after
+  each iteration (`forge-status` / `forge-cancel` manage the session).
 - **Any agent, no driver tooling** — follow phases A–H directly: generate a session ID,
   create the state file in the documented format (§ Forge State File Format), and iterate.
   The driver scripts are convenience, not a requirement.

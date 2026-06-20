@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-06-20
+
+### Added
+- **`forge-run` — autonomous Codex driver.** Drives a whole Forge loop hands-free: scaffolds the session, then runs one `codex exec` per iteration (fresh context each round; state in `.codex/forge/`) until the agent emits `FORGE_COMPLETE`, an iteration records no progress (stall guard), or max-iterations is reached. Defaults to `codex exec -c approval_policy=never -c sandbox_mode=workspace-write` so it never blocks on approval prompts; the `codex` binary and exec args are overridable via `FORGE_CODEX_BIN` / `FORGE_CODEX_ARGS`. Resume with `forge-run --session ID`. This gives Codex true Ralph-style auto-iteration alongside the existing manual `forge-init`/`forge-continue` flow. Linked by `install-codex.sh`; covered by tests that mock `codex` (autonomous completion + stall guard).
+
+### Changed
+- SKILL.md activation guidance and the Codex driver docs now lead with `forge-run` for hands-free runs, keeping `forge-init`/`forge-continue` for step-by-step control. Support matrix promotes Codex from "manual driver" to "first-class driver".
+
 ## [0.9.1] - 2026-06-19
 
 ### Fixed

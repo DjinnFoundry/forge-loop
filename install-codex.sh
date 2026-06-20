@@ -19,7 +19,8 @@ for src in \
   "drivers/codex/bin/forge-init" \
   "drivers/codex/bin/forge-continue" \
   "drivers/codex/bin/forge-cancel" \
-  "drivers/codex/bin/forge-status"
+  "drivers/codex/bin/forge-status" \
+  "drivers/codex/bin/forge-run"
 do
   if [[ ! -f "${SCRIPT_DIR}/${src}" ]]; then
     echo "Error: Source file not found: ${SCRIPT_DIR}/${src}" >&2
@@ -32,7 +33,8 @@ for target in \
   "${CODEX_BIN_DIR}/forge-init" \
   "${CODEX_BIN_DIR}/forge-continue" \
   "${CODEX_BIN_DIR}/forge-cancel" \
-  "${CODEX_BIN_DIR}/forge-status"
+  "${CODEX_BIN_DIR}/forge-status" \
+  "${CODEX_BIN_DIR}/forge-run"
 do
   if [[ -L "$target" ]] || [[ -f "$target" ]]; then
     rm -f "$target"
@@ -44,25 +46,29 @@ ln -s "${SCRIPT_DIR}/drivers/codex/bin/forge-init" "${CODEX_BIN_DIR}/forge-init"
 ln -s "${SCRIPT_DIR}/drivers/codex/bin/forge-continue" "${CODEX_BIN_DIR}/forge-continue"
 ln -s "${SCRIPT_DIR}/drivers/codex/bin/forge-cancel" "${CODEX_BIN_DIR}/forge-cancel"
 ln -s "${SCRIPT_DIR}/drivers/codex/bin/forge-status" "${CODEX_BIN_DIR}/forge-status"
+ln -s "${SCRIPT_DIR}/drivers/codex/bin/forge-run" "${CODEX_BIN_DIR}/forge-run"
 
 chmod +x \
   "${SCRIPT_DIR}/drivers/codex/lib.sh" \
   "${SCRIPT_DIR}/drivers/codex/bin/forge-init" \
   "${SCRIPT_DIR}/drivers/codex/bin/forge-continue" \
   "${SCRIPT_DIR}/drivers/codex/bin/forge-cancel" \
-  "${SCRIPT_DIR}/drivers/codex/bin/forge-status"
+  "${SCRIPT_DIR}/drivers/codex/bin/forge-status" \
+  "${SCRIPT_DIR}/drivers/codex/bin/forge-run"
 
 echo "  Linked skills/forge/SKILL.md"
 echo "  Linked drivers/codex/bin/forge-init"
 echo "  Linked drivers/codex/bin/forge-continue"
 echo "  Linked drivers/codex/bin/forge-cancel"
 echo "  Linked drivers/codex/bin/forge-status"
+echo "  Linked drivers/codex/bin/forge-run"
 echo ""
 echo "Done. forge-loop Codex driver installed."
 echo ""
 echo "Add ~/.codex/bin to PATH if it is not already available."
 echo "Usage:"
-echo "  forge-init \"scope\" --coverage 90 --speed -20%"
+echo "  forge-run \"scope\" --coverage 90 --speed -20%   # autonomous loop (codex exec)"
+echo "  forge-init \"scope\" --coverage 90 --speed -20%  # manual loop (paste prompt)"
 echo "  forge-continue"
 echo "  forge-cancel"
 echo "  forge-status"

@@ -6,6 +6,7 @@ INIT_PATH="${ROOT_DIR}/drivers/codex/bin/forge-init"
 CONTINUE_PATH="${ROOT_DIR}/drivers/codex/bin/forge-continue"
 CANCEL_PATH="${ROOT_DIR}/drivers/codex/bin/forge-cancel"
 STATUS_PATH="${ROOT_DIR}/drivers/codex/bin/forge-status"
+RUN_PATH="${ROOT_DIR}/drivers/codex/bin/forge-run"
 INSTALL_PATH="${ROOT_DIR}/install-codex.sh"
 
 fail() {
@@ -119,6 +120,7 @@ test_codex_install() {
     assert_file "$tmp_home/.codex/bin/forge-continue" "install-codex should link forge-continue"
     assert_file "$tmp_home/.codex/bin/forge-cancel" "install-codex should link forge-cancel"
     assert_file "$tmp_home/.codex/bin/forge-status" "install-codex should link forge-status"
+    assert_file "$tmp_home/.codex/bin/forge-run" "install-codex should link forge-run"
   )
   rm -rf "$repo_dir" "$tmp_home"
 }
@@ -206,6 +208,63 @@ test_scripts_work_through_symlink() {
   rm -rf "$repo_dir" "$bin_dir"
 }
 
+# forge-run drives the loop autonomously via `codex exec`. We mock the codex binary
+# (FORGE_CODEX_BIN) so the loop logic is tested without a real model or token spend:
+# the mock records one iteration per call and emits FORGE_COMPLETE on the second.
+test_forge_run_autoiterates_until_complete() {
+  local repo_dir bin_dir
+  repo_dir="$(mktemp -d)"
+  bin_dir="$(mktemp -d)"
+  cat > "${bin_dir}/codex" <<'MOCK'
+#!/usr/bin/env bash
+# Mock `codex exec`: simulate one Forge iteration by recording it in forge-state,
+# and signal completion on the second iteration.
+shift || true   # drop the `exec` subcommand; ignore flags + prompt
+state="$(ls .codex/forge/forge-state.*.md 2>/dev/null | head -1)"
+[[ -n "$state" ]] || { echo "mock: no forge-state found" >&2; exit 1; }
+n=$(( $(grep -c '^## Iteration ' "$state") + 1 ))
+printf '\n## Iteration %d - mock\n- Coverage: +1.0%%\n' "$n" >> "$state"
+echo "mock codex ran iteration ${n}"
+if (( n >= 2 )); then echo "FORGE_COMPLETE"; fi
+MOCK
+  chmod +x "${bin_dir}/codex"
+  (
+    cd "$repo_dir"
+    output="$(FORGE_CODEX_BIN="${bin_dir}/codex" FORGE_CODEX_ARGS=" " "$RUN_PATH" "autonomous scope" --max-iterations 5)"
+    assert_contains "$output" "FORGE_COMPLETE — session" "forge-run should stop on FORGE_COMPLETE"
+    state_file="$(ls .codex/forge/forge-state.*.md | head -1)"
+    iteration_count="$(grep -c '^## Iteration ' "$state_file" || true)"
+    assert_equals "2" "$iteration_count" "forge-run should iterate until the completion marker (2 mock iterations)"
+    loop_file="$(ls .codex/forge/loop-state.*.md | head -1)"
+    assert_contains "$(grep '^active:' "$loop_file")" "false" "forge-run should deactivate loop state when the run ends"
+  )
+  rm -rf "$repo_dir" "$bin_dir"
+}
+
+# forge-run must stop instead of looping forever when an iteration records no progress.
+test_forge_run_stops_on_stall() {
+  local repo_dir bin_dir
+  repo_dir="$(mktemp -d)"
+  bin_dir="$(mktemp -d)"
+  cat > "${bin_dir}/codex" <<'MOCK'
+#!/usr/bin/env bash
+# Mock that never records progress and never completes.
+shift || true
+echo "mock codex did nothing"
+MOCK
+  chmod +x "${bin_dir}/codex"
+  (
+    cd "$repo_dir"
+    output="$(FORGE_CODEX_BIN="${bin_dir}/codex" FORGE_CODEX_ARGS=" " "$RUN_PATH" "stall scope" --max-iterations 9 2>&1)"
+    assert_contains "$output" "no progress" "forge-run should detect a stall"
+    assert_contains "$output" "without a completion marker" "forge-run should report it stopped without completing"
+    state_file="$(ls .codex/forge/forge-state.*.md | head -1)"
+    iteration_count="$(grep -c '^## Iteration ' "$state_file" || true)"
+    assert_equals "0" "$iteration_count" "forge-run should not fabricate iterations on a stall"
+  )
+  rm -rf "$repo_dir" "$bin_dir"
+}
+
 main() {
   test_codex_init_continue_cancel
   test_open_text_success_contract_round_trips
@@ -213,6 +272,8 @@ main() {
   test_multiple_active_sessions_require_explicit_id
   test_status_and_error_paths
   test_scripts_work_through_symlink
+  test_forge_run_autoiterates_until_complete
+  test_forge_run_stops_on_stall
   echo "codex-driver tests passed"
 }
 

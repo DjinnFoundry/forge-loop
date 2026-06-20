@@ -21,7 +21,7 @@
 **A task loop with KPI guardrails for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex/manual workflows.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.9.1-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.10.0-green.svg)](CHANGELOG.md)
 
 Forge is a protocol plus adapters. It takes open-text software tasks, keeps coverage/speed/quality as guardrails, records state across iterations, and runs until the work is honestly done or you stop it.
 
@@ -72,9 +72,10 @@ The bundled runtime adapter in this repo:
 
 ### Codex Driver
 
-The bundled Codex/manual adapter in this repo:
+The bundled Codex adapter in this repo:
 
 - `install-codex.sh`
+- `drivers/codex/bin/forge-run` — **autonomous** loop (a fresh `codex exec` per iteration)
 - `drivers/codex/bin/forge-init`
 - `drivers/codex/bin/forge-continue`
 - `drivers/codex/bin/forge-cancel`
@@ -82,16 +83,16 @@ The bundled Codex/manual adapter in this repo:
 - `.codex/forge/` state layout for per-project sessions
 - shared shell state helpers reused across drivers
 
-Both drivers are first-class. The difference is automation depth:
-Claude gets hook-driven iteration; Codex gets manual driver scripts that print
-the next prompt and manage session state.
+Both drivers are first-class. Claude gets hook-driven iteration inside one session;
+Codex gets `forge-run` for hands-free iteration (a fresh `codex exec` per round, state in
+`.codex/forge/`) plus `forge-init` / `forge-continue` for step-by-step manual control.
 
 ## Support Matrix
 
 | Environment | Status | What is actually shipped |
 |-------------|--------|--------------------------|
 | Claude Code | First-class | Command, agent, stop-hook driver, installer |
-| Codex CLI | First-class manual driver | Install script, `forge-init`, `forge-continue`, `forge-cancel`, project-local state |
+| Codex CLI | First-class driver | Install script, `forge-run` (autonomous via `codex exec`), `forge-init` / `forge-continue` / `forge-status` / `forge-cancel`, project-local state |
 | Other agents / plain shell | Protocol-only | Reuse the protocol and state model manually |
 
 Forge is not claiming native parity across agent runtimes. It ships two real drivers with different control surfaces.
@@ -235,11 +236,25 @@ cd forge-loop
 The Codex installer links Forge Core into `~/.codex/skills/forge/` and installs
 driver entrypoints into `~/.codex/bin/`.
 
-### Codex / Manual Use
+### Codex
 
-Codex support is manual by design, but it is now a real shipped driver.
+**Autonomous (hands-free):**
 
-Typical flow:
+```bash
+forge-run "scope" [--done-when "TEXT"] [--coverage N] [--quality strict|moderate|lax] [--max-iterations N]
+```
+
+`forge-run` drives the whole loop: it scaffolds state, then runs one `codex exec` per
+iteration (fresh context each round; state in `.codex/forge/`) until the agent emits
+`FORGE_COMPLETE`, a no-progress stall is detected, or max-iterations is reached. No
+per-iteration babysitting. By default it runs `codex exec` with
+`-c approval_policy=never -c sandbox_mode=workspace-write` so it never blocks on approval
+prompts; override with `FORGE_CODEX_ARGS`.
+
+In an interactive Codex session, saying **"forge it"** loads the skill, and Codex can
+either run `forge-run` for you or follow the protocol directly.
+
+**Manual (step-by-step control):**
 
 1. Run `forge-init "scope" [--done-when "TEXT"] ...` in the target project.
 2. Paste the printed prompt into Codex.
@@ -247,10 +262,9 @@ Typical flow:
 4. Use `forge-status` to inspect the active session.
 5. Use `forge-cancel` to stop the active loop while preserving Forge state.
 
-This is a first-class manual driver, not a hook-based runtime integration.
-
 Driver safety:
 
+- `forge-run` stops on a no-progress stall and at max-iterations — it will not loop forever
 - `forge-continue` derives the next iteration from recorded Forge state entries
 - multiple active Codex sessions require an explicit session id instead of implicit selection
 - `forge-status` is read-only and reports the next required iteration from Forge state
